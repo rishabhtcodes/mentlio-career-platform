@@ -96,7 +96,7 @@ export async function POST(request: Request) {
 
     const llm = new ChatGroq({
       apiKey,
-      model: "llama-3.3-70b-versatile",
+      model: "qwen/qwen3.8-27b",
       temperature: 0.4,
       maxTokens: 600,
     });
