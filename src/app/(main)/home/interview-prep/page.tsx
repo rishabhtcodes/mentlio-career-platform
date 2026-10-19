@@ -20,7 +20,10 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { format } from "date-fns";
 
+import { useRouter } from "next/navigation";
+
 const InterviewDefault = () => {
+  const router = useRouter();
   const { user } = useUserData();
   const [feedbacks, setFeedbacks] = useState<InterviewFeedback[]>([]);
   const [loading, setLoading] = useState(true);
@@ -65,8 +68,9 @@ const InterviewDefault = () => {
               <LuCircleFadingArrowUp className="inline w-5 h-5 ml-2" />
             </h2>
             <Button
-              className="text-sm font-inter mt-4 w-full"
+              className="text-sm font-inter mt-4 w-full cursor-pointer"
               variant="outline"
+              onClick={() => router.push("/home/interview-prep/start")}
             >
               Create New{" "}
               <LuCircleFadingArrowUp className="inline w-5 h-5 ml-2" />{" "}
@@ -76,8 +80,9 @@ const InterviewDefault = () => {
               <LucideActivity className="inline w-5 h-5 ml-2" />
             </h2>
             <Button
-              className="text-sm font-inter mt-4 w-full"
+              className="text-sm font-inter mt-4 w-full cursor-pointer"
               variant="outline"
+              onClick={() => router.push("/home/job-tracker")}
             >
               Job Tracker <LucideActivity className="inline w-5 h-5 ml-2" />{" "}
             </Button>
