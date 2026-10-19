@@ -26,10 +26,6 @@ type HistoryPart =
   | { functionCall: any }
   | { functionResponse: any };
 
-const history: Array<{
-  role: string;
-  parts: HistoryPart[];
-}> = [];
 
 // ----------------------TOOLS---------------------------
 //webSearch tool----------------------------------------
@@ -179,6 +175,12 @@ export async function runAgent(ctx: AgentContext) {
     summary,
     stream,
   } = ctx;
+
+  // Isolated per-call history — prevents cross-user session leakage
+  const history: Array<{
+    role: string;
+    parts: HistoryPart[];
+  }> = [];
 
   const availableTools: ToolMap = {
     retrival: ({ userQuery }) => retrival(userQuery),

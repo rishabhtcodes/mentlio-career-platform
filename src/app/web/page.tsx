@@ -138,8 +138,8 @@ const Webpage = () => {
 
           <div className="max-w-[500px] ">
             <p className="font-inter text-lg text-muted-foreground font-light tracking-tight leading-loose">
-              Lorem ipsum dolor, sit amet consectetur adipisicing elit. Quisquam
-              eveniet amet optio magni doloremque porro eos
+              Eliminate guesswork from your career path with AI-driven milestones,
+              realistic voice mock interviews, and tailored industry roadmaps.
             </p>
           </div>
         </div>
@@ -151,14 +151,14 @@ const Webpage = () => {
               <div className="flex flex-col space-y-5 w-full">
                 {/* 1 */}
                 <div className="border rounded-xl p-4 h-[360px] flex flex-col">
-                  <h2 className="font-inter font-semibold opacity-50 tracking-tight">
-                    Lorem ipsum dolor sit amet consectetur adipisicing elit.
-                    Dicta, dolorum.
+                  <h2 className="font-inter font-semibold opacity-70 tracking-tight">
+                    Candidates practicing with Mentlio AI mock interviews show
+                    unmatched confidence and clear articulation in technical screenings.
                   </h2>
 
                   <div className="mt-auto flex items-center justify-between">
                     <h2 className="font-sora text-5xl font-extrabold">90% </h2>
-                    <p>Lorem, ipsum dolor.</p>
+                    <p className="font-inter text-sm text-muted-foreground">First-Round Pass Rate</p>
                   </div>
                 </div>
                 {/* 2 */}
@@ -192,25 +192,24 @@ const Webpage = () => {
                       <LuPlus className="text-[25px] text-black cursor-pointer" />
                     </div>
                   </div>
-                  <p className="font-semibold font-inter text-xl">200+ </p>
+                  <p className="font-semibold font-inter text-xl">200+ Mentors</p>
                 </div>
               </div>
 
               <div className="flex flex-col space-y-5 w-full">
                 <div className="border rounded-xl p-4 h-[360px] flex flex-col">
                   <p className="font-inter text-lg tracking-tight leading-tight">
-                    Lorem ipsum dolor sit amet consectetur adipisicing elit.
-                    Amet aliquam eaque nulla!
+                    Custom-generated skill roadmaps dynamically aligned with current
+                    hiring market requirements and real job descriptions.
                   </p>
                   <div className="mt-auto">
                     <p className="text-5xl font-extrabold font-sora">500+</p>
-                    <p>Lorem ipsum dolor sit.</p>
+                    <p className="font-inter text-sm text-muted-foreground">Roadmaps Completed</p>
                   </div>
                 </div>
                 <div className=" p-4 h-[120px]">
-                  <p className="font-inter tracking-tight text-blue-600">
-                    Lorem ipsum dolor sit amet consectetur adipisicing. Libero,
-                    iure.
+                  <p className="font-inter tracking-tight text-blue-600 font-medium">
+                    Targeted practice modules designed to close your specific skill gaps quickly.
                   </p>
                 </div>
               </div>
@@ -218,10 +217,9 @@ const Webpage = () => {
           </div>
           {/* RIGHT SIDE */}
           <div className="w-[45%] bg-gradient-to-br from-slate-700 to-slate-900 rounded-xl relative overflow-hidden p-4 flex flex-col">
-            <h2 className="font-inter text-white text-xl tracking-tight ">
-              Lorem ipsum dolor sit amet consectetur, adipisicing elit. A
-              veritatis vel totam dolores excepturi, quod obcaecati eaque modi
-              beatae mollitia?
+            <h2 className="font-inter text-white text-xl tracking-tight leading-relaxed">
+              Our intelligent career coach assesses your strengths, simulates realistic
+              interview challenges, and gives you actionable pointers to stand out.
             </h2>
             <LuTrendingUp className="absolute w-[400px] h-[400px] text-white opacity-15 -left-10 -bottom-5" />
 
@@ -229,7 +227,9 @@ const Webpage = () => {
               <p className="font-sora text-6xl font-extrabold text-white">
                 4.8/5
               </p>
-              <div></div>
+              <p className="font-inter text-white/70 text-right self-end text-sm">
+                Candidate Satisfaction Score
+              </p>
             </div>
           </div>
         </div>
@@ -252,22 +252,22 @@ const Webpage = () => {
               WELCOME TO MENTLIO
             </h2>
             <h1 className="md:text-3xl font-sora font-extrabold mt-3">
-              Lorem ipsum dolor sit amet consectetur.
+              Everything You Need for Career{" "}
               <span className="bg-gradient-to-br from-blue-700 via-blue-500 to-indigo-300 text-transparent bg-clip-text tracking-tight font-sora font-extrabold">
-                Clarity
+                Success
               </span>
             </h1>
           </div>
 
           <div className=" flex items-center gap-3">
-            <div className="border rounded-full py-1 px-2 w-fit">
-              <p className="font-inter font-light tracking-wide">intelligent</p>
+            <div className="border rounded-full py-1 px-3 w-fit">
+              <p className="font-inter font-medium text-sm tracking-wide text-gray-700">Intelligent</p>
             </div>
-            <div className="border rounded-full py-1 px-2 w-fit">
-              <p className="font-inter font-light tracking-wide">Desire</p>
+            <div className="border rounded-full py-1 px-3 w-fit">
+              <p className="font-inter font-medium text-sm tracking-wide text-gray-700">Goal-Driven</p>
             </div>
-            <div className="border rounded-full py-1 px-2 w-fit">
-              <p className="font-inter font-light tracking-wide">Sexy</p>
+            <div className="border rounded-full py-1 px-3 w-fit">
+              <p className="font-inter font-medium text-sm tracking-wide text-gray-700">Adaptive</p>
             </div>
             <div className="border rounded-full py-1 px-2 w-fit">
               <LuPlus className="text-[20px] text-black cursor-pointer" />
@@ -309,10 +309,10 @@ const Webpage = () => {
           WHY MENTLIO
         </h2>
         <h1 className="mt-2 text-5xl font-extrabold text-center font-sora">
-          Lorem ipsum, dolor sit amet consectetur.
+          Accelerate Your Professional Growth
         </h1>
-        <p className="font-inter text-xl opacity-50 mt-2 text-center tracking-wide text-muted-foreground ">
-          Lorem ipsum dolor sit, amet consectetur adipisicing elit.lorem5
+        <p className="font-inter text-xl opacity-70 mt-2 text-center tracking-wide text-muted-foreground ">
+          From custom roadmaps to AI mock interviews and expert mentor sessions.
         </p>
         <div className="w-full grid md:grid-cols-3 justify-items-center mt-20 md:max-w-[1080px] mx-auto ">
           {/* 1 */}
@@ -347,16 +347,15 @@ const Webpage = () => {
               </div>
             </div>
 
-            <p className="text-muted-foreground mt-8 font-inter text-base tracking-tight">
-              Lorem ipsum dolor sit amet consectetur adipisicing elit. Corrupti,
-              numquam.
+            <p className="text-white/80 mt-8 font-inter text-base tracking-tight">
+              Real-world feedback loops that benchmark your skills against modern industry standards in real time.
             </p>
 
             <div className="mt-auto">
-              <Separator className="my-4 bg-muted-foreground" />
+              <Separator className="my-4 bg-muted-foreground/40" />
 
-              <h2 className="font-sora text-lg font-semibold text-white">
-                Lorem ipsum, dolor sit amet consectetur adipisicing elit.
+              <h2 className="font-sora text-base font-semibold text-white">
+                Trusted by job seekers preparing for top tech roles.
               </h2>
             </div>
           </div>
@@ -371,13 +370,12 @@ const Webpage = () => {
             />
 
             <p className="text-white font-inter text-base tracking-tight">
-              Lorem ipsum dolor sit amet consectetur adipisicing elit. Corrupti,
-              numquam.
+              Personalized career roadmaps broken down into weekly milestones, key projects, and recommended resources.
             </p>
 
             <div className="mt-auto">
-              <h2 className="font-sora text-lg font-semibold text-white backdrop-blur-xl px-2 py-4 rounded-xl overflow-hidden">
-                Lorem ipsum, dolor sit amet consectetur adipisicing elit.
+              <h2 className="font-sora text-base font-semibold text-white backdrop-blur-xl px-2 py-4 rounded-xl overflow-hidden">
+                Actionable milestones keep you focused, accountable, and job-ready.
               </h2>
             </div>
           </div>
@@ -393,15 +391,15 @@ const Webpage = () => {
                   height={58}
                   className="rounded-full  h-[50px] w-[50px] sm:h-[50px] sm:w-[50px] border-2 border-white shadow-md object-cover"
                 />
-                <p className="font-inter text-white ">Rakesh sharma</p>
+                <p className="font-inter text-white font-medium">Rakesh Sharma</p>
               </div>
 
               <p className="font-sora text-4xl font-extrabold text-white mt-5 ">500+</p>
-              <p className="font-inter text-base text-white tracking-tight mt-2">Lorem ipsum dolor sit amet cons.</p>
+              <p className="font-inter text-base text-white tracking-tight mt-2">Mock Interviews Completed</p>
             </div>
 
-            <h2 className="font-sora text-2xl tracking-tight font-semibold mt-auto text-center">Lorem, ipsum dolor.</h2>
-            <p className="font-inter text-lg text-center leading-tight mt-2">Lorem ipsum, dolor sit amet consectetur adipisicing elit.</p>
+            <h2 className="font-sora text-xl tracking-tight font-semibold mt-auto text-center text-white">Data-Driven Insights</h2>
+            <p className="font-inter text-sm text-center leading-tight mt-2 text-white/90">Detailed feedback scores on technical accuracy, structure, and communication.</p>
           </div>
         </div>
       </section>
