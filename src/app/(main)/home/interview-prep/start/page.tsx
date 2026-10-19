@@ -37,13 +37,7 @@ import axios from "axios";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
-const VAPI_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY;
-
-if (!VAPI_PUBLIC_KEY) {
-  throw new Error(
-    "NEXT_PUBLIC_VAPI_PUBLIC_KEY is required. Please set it in your .env.local file."
-  );
-}
+const VAPI_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY || "";
 
 interface Message {
   type: "user" | "assistant";
@@ -137,6 +131,10 @@ const InterviewStart = () => {
   }, [interviewData]);
 
   const startCall = async () => {
+    if (!VAPI_PUBLIC_KEY || VAPI_PUBLIC_KEY === "dummy_vapi_key") {
+      toast.error("Vapi voice key is not configured. Please add NEXT_PUBLIC_VAPI_PUBLIC_KEY in .env.local to enable voice calls.");
+      return;
+    }
     const questionList = interviewData?.questions
       ?.map((q: any) => q.question)
       .join(", ");
