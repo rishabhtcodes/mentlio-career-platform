@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-"use server";
+// NOTE: This file contains async data access functions used by client components.
+// It intentionally uses the browser supabase client.
 
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -10,7 +11,6 @@ import {
   College,
 } from "../types/allTypes";
 // import { redis } from "@/lib/redis";
-import { useNotificationStore } from "../store/NotificationStore";
 
 // Interface for the response structure
 interface PaginatedMentors {
@@ -609,6 +609,7 @@ export async function getReviewsByMentorId(mentorId: string) {
 }
 
 // NOTIFICATION FROM SESSION BOOKING
+// Saves the notification directly to Supabase (no Zustand dependency)
 export async function triggerSessionNotification({
   userId,
   sessionType,
@@ -620,10 +621,14 @@ export async function triggerSessionNotification({
   mentorName: string;
   scheduledAt: Date;
 }) {
+  const supabase = createClient();
   const message = `You have requested a ${sessionType} session with ${mentorName} (status: pending) on ${scheduledAt.toLocaleString()}`;
 
-  useNotificationStore.getState().addNotification({
-    userId,
-    message,
-  });
+  const { error } = await supabase
+    .from("notification")
+    .insert([{ userId, message }]);
+
+  if (error) {
+    console.error("Failed to save notification:", error);
+  }
 }
