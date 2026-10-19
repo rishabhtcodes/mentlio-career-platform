@@ -1,6 +1,7 @@
 import { ArrowRight, Book, LucideArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
+import Link from "next/link";
 
 const SingleCard = () => {
   const card = {
@@ -33,10 +34,11 @@ const SingleCard = () => {
 
             {/* Call-to-action buttons */}
             <div className="flex items-center gap-8">
-             
-              <Button className="cursor-pointer" variant="outline">
-                Start Now <LucideArrowRight size={18} />
-              </Button>
+              <Link href="/home/interview-prep/start">
+                <Button className="cursor-pointer" variant="outline">
+                  Start Now <LucideArrowRight size={18} />
+                </Button>
+              </Link>
             </div>
           </div>
         </div>
