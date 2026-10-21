@@ -49,6 +49,9 @@ export default function AuthPage() {
           setError("Please check your email for verification link");
           return;
         }
+        if (data.session) {
+          router.push("/auth-mentor/callback");
+        }
       } else {
         const { data, error } = await supabase.auth.signInWithPassword({
           email,
