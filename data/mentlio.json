@@ -1,0 +1,134 @@
+{
+  "users": [
+    {
+      "id": 1792450751696,
+      "userName": "Test Student",
+      "userEmail": "student_1792450750852@mentlio.local",
+      "passwordHash": "fb0367901d0d51f4074f75d60daac81e:ccafb368fb767f1419c8907b573c72701004d0088ca36809be5fa5ea9c0bf8c75c296cdce33ec3881c028a81b699f5699ce1de352a4ca4e24097ddd3a39a0271",
+      "avatar": "/user5.png",
+      "created_at": "2026-10-19T22:59:11.696Z",
+      "totalCredits": 10,
+      "remainingCredits": 10,
+      "invite_link": "4d36a3e4-ebce-429b-8a60-173070369f5a",
+      "current_status": "",
+      "userPhone": "",
+      "institutionName": "",
+      "mainFocus": "",
+      "is_verified": false,
+      "isQuizDone": false,
+      "latitude": 0,
+      "longitude": 0,
+      "isPro": false,
+      "google_refresh_token": ""
+    },
+    {
+      "id": 1792450830813,
+      "userName": "candidate_demo",
+      "userEmail": "candidate_demo@mentlio.local",
+      "passwordHash": "40f5e32b50ef61cc4362af6bcb00afd1:0bdbfd175c046081e915957b59ddabed9d9f2af19cd03d6ae3a17da0fb8e71c6c160c8f2e4ef6eb90512e6771dbe731be51af1255e2097311425f07324f773d0",
+      "avatar": "/user4.png",
+      "created_at": "2026-10-19T23:00:30.813Z",
+      "totalCredits": 10,
+      "remainingCredits": 10,
+      "invite_link": "27257855-30fc-4952-89fe-cea2e972a401",
+      "current_status": "",
+      "userPhone": "",
+      "institutionName": "",
+      "mainFocus": "",
+      "is_verified": false,
+      "isQuizDone": false,
+      "latitude": 0,
+      "longitude": 0,
+      "isPro": false,
+      "google_refresh_token": ""
+    },
+    {
+      "id": 1792451853257,
+      "userName": "candidate_test_99",
+      "userEmail": "candidate_test_99@mentlio.local",
+      "passwordHash": "7b425e149026175fa5367a9cc2515064:b3b1e2c1304b4635cc46460ef5c923ed34e61daed71508935a452e2787ebdb4b9a632fd03665dc730759ea9ae613f1bef8332ec69951272441757204e4733e69",
+      "avatar": "/user1.png",
+      "created_at": "2026-10-19T23:17:33.257Z",
+      "totalCredits": 10,
+      "remainingCredits": 10,
+      "invite_link": "8f4473c3-b99f-4859-bb1b-0b0b4d09a2de",
+      "current_status": "",
+      "userPhone": "",
+      "institutionName": "",
+      "mainFocus": "",
+      "is_verified": false,
+      "isQuizDone": false,
+      "latitude": 0,
+      "longitude": 0,
+      "isPro": false,
+      "google_refresh_token": ""
+    }
+  ],
+  "mentors": [
+    {
+      "id": "mentor-1",
+      "full_name": "Aman Gupta",
+      "email": "aman@mentlio.local",
+      "phone": "+91 9876543210",
+      "linkedin": "https://linkedin.com/in/amangupta",
+      "bio": "Senior Software Architect at Google with 10+ years of cloud distributed systems experience.",
+      "expertise": [
+        "Full Stack",
+        "System Design",
+        "Cloud Architecture"
+      ],
+      "current_position": "Staff Software Engineer",
+      "availability": true,
+      "rating": 4.9,
+      "avatar": "/a1.png",
+      "created_at": "2026-10-19T22:59:11.560Z",
+      "is_verified": true,
+      "video_url": null
+    },
+    {
+      "id": "mentor-2",
+      "full_name": "Sneha Reddy",
+      "email": "sneha@mentlio.local",
+      "phone": "+91 9876543211",
+      "linkedin": "https://linkedin.com/in/snehareddy",
+      "bio": "Tech Lead & AI specialist. Passionate about helping students transition into ML & data engineering.",
+      "expertise": [
+        "Machine Learning",
+        "Python",
+        "Data Engineering"
+      ],
+      "current_position": "Lead AI Engineer",
+      "availability": true,
+      "rating": 4.8,
+      "avatar": "/a2.png",
+      "created_at": "2026-10-19T22:59:11.560Z",
+      "is_verified": true,
+      "video_url": null
+    }
+  ],
+  "userQuizData": [],
+  "others": [],
+  "notification": [],
+  "colleges": [
+    {
+      "id": 1,
+      "name": "Indian Institute of Technology, Bombay",
+      "location": "Mumbai",
+      "rating": 4.9
+    },
+    {
+      "id": 2,
+      "name": "Indian Institute of Technology, Delhi",
+      "location": "New Delhi",
+      "rating": 4.9
+    },
+    {
+      "id": 3,
+      "name": "BITS Pilani",
+      "location": "Pilani",
+      "rating": 4.8
+    }
+  ],
+  "tracks": [],
+  "mentor_sessions": []
+}
