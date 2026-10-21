@@ -20,9 +20,11 @@ class QuestionGenerationPipeline {
         throw new Error('GROQ_API_KEY environment variable is not set');
       }
       
+      const modelName = process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
+      
       this.llm = new ChatGroq({
         apiKey: apiKey,
-        model: 'llama-3.1-8b-instant', // Ultra-fast model for quiz generation
+        model: modelName,
         temperature: 0.7,
         maxTokens: 2000, // Optimized for speed
       });

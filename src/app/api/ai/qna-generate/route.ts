@@ -52,11 +52,13 @@ export async function POST(request: Request) {
       );
     }
 
+    const modelName = process.env.GROQ_MODEL || "openai/gpt-oss-120b";
+
     const llm = new ChatGroq({
       apiKey,
-      model: "qwen/qwen3.8-27b",
-      temperature: 0.7,
-      maxTokens: 600,
+      model: modelName,
+      temperature: 0.6,
+      maxTokens: 2500,
       maxRetries: 3,
     });
 
@@ -78,18 +80,37 @@ export async function POST(request: Request) {
       format_instructions: parser.getFormatInstructions(),
     };
 
-    // Run the chain
-    const result = await chain.invoke(input);
+    let result: any;
+    try {
+      result = await chain.invoke(input);
+    } catch (parseErr) {
+      console.warn("Chain parsing failed in qna-generate, trying fallback extraction...", parseErr);
+      const rawRes = await promptTemplate.pipe(llm).invoke(input);
+      const text = typeof rawRes.content === "string" ? rawRes.content : JSON.stringify(rawRes.content);
+      const jsonMatch = text.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
+      if (jsonMatch) {
+        result = JSON.parse(jsonMatch[0]);
+      } else {
+        throw parseErr;
+      }
+    }
 
-    // Fallback to extract inner object for UI
-    const finalResult =
-      Array.isArray(result) && result[0]?.interviewQuestions
-        ? { interviewQuestions: result[0].interviewQuestions }
-        : result;
+    let questions: any[] = [];
+    if (Array.isArray(result)) {
+      questions = result[0]?.interviewQuestions || result;
+    } else if (result?.interviewQuestions) {
+      questions = result.interviewQuestions;
+    }
+
+    const finalResult = {
+      interviewQuestions: questions.map((q: any) => ({
+        question: typeof q === "string" ? q : q?.question || "",
+      })),
+    };
 
     return NextResponse.json({ data: finalResult });
   } catch (error: any) {
-    console.error("❌ ERROR:", error);
+    console.error("❌ ERROR in qna-generate:", error);
     return NextResponse.json(
       { isError: true, error: error.message || "Failed to generate questions" },
       { status: 500 }

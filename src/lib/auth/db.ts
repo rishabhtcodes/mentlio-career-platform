@@ -13,6 +13,8 @@ export interface DatabaseSchema {
   colleges: Array<Record<string, any>>;
   tracks: Array<Record<string, any>>;
   mentor_sessions: Array<Record<string, any>>;
+  payments: Array<Record<string, any>>;
+  orders: Array<Record<string, any>>;
 }
 
 const DEFAULT_DB: DatabaseSchema = {
@@ -61,6 +63,8 @@ const DEFAULT_DB: DatabaseSchema = {
   ],
   tracks: [],
   mentor_sessions: [],
+  payments: [],
+  orders: [],
 };
 
 function ensureDbFile(): DatabaseSchema {
@@ -72,7 +76,10 @@ function ensureDbFile(): DatabaseSchema {
       fs.writeFileSync(DB_FILE, JSON.stringify(DEFAULT_DB, null, 2), "utf8");
       return DEFAULT_DB;
     }
-    const raw = fs.readFileSync(DB_FILE, "utf8");
+    let raw = fs.readFileSync(DB_FILE, "utf8");
+    if (raw.charCodeAt(0) === 0xFEFF) {
+      raw = raw.slice(1);
+    }
     return JSON.parse(raw);
   } catch (err) {
     console.error("Error reading database file, using fallback:", err);

@@ -3,13 +3,15 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useRazorpayStore } from "@/lib/store/RazorpayStore";
+import { useUserData } from "@/context/UserDataProvider";
 
 const TOP_UP_OPTIONS = [25, 50, 100, 200];
 
 export function TopupCard() {
   const [selectedAmount, setSelectedAmount] = useState<number>(50);
 
-  const { setAmount, startPayment, loading } = useRazorpayStore();
+  const { setAmount, setSelectedPlanId, startPayment, loading } = useRazorpayStore();
+  const { ensureUserInDB } = useUserData();
 
   const discountedPrice = selectedAmount * 20 - 90; 
   const razorpayAmount = discountedPrice; 
@@ -53,10 +55,13 @@ export function TopupCard() {
       <Button
         onClick={() => {
           setAmount(razorpayAmount); 
-          startPayment();
+          setSelectedPlanId(`topup_${selectedAmount}`);
+          startPayment(() => {
+            ensureUserInDB();
+          });
         }}
         disabled={loading}
-        className="mb-6 rounded-full border border-gray-800 bg-transparent font-semibold text-gray-800 transition-colors hover:bg-gray-100"
+        className="mb-6 rounded-full border border-gray-800 bg-transparent font-semibold text-gray-800 transition-colors hover:bg-gray-100 cursor-pointer"
         variant="outline"
       >
         {loading ? "Processing..." : "Top Up Now"}

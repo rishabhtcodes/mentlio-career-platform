@@ -2,6 +2,7 @@ import { Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useRazorpayStore } from "@/lib/store/RazorpayStore";
+import { useUserData } from "@/context/UserDataProvider";
 import Script from 'next/script';
 
 interface PricingCardProps {
@@ -23,8 +24,9 @@ export function PricingCard({
 }: PricingCardProps) {
   const displayPrice = isYearly ? Math.round(price * 0.8) : price;
 
-  const { amount, loading, message, setAmount, startPayment } =
+  const { loading, setAmount, setSelectedPlanId, startPayment } =
     useRazorpayStore();
+  const { ensureUserInDB } = useUserData();
 
   return (
     <>
@@ -79,7 +81,10 @@ export function PricingCard({
           <Button
             onClick={() => {
               setAmount(displayPrice);
-              startPayment();
+              setSelectedPlanId(isYearly ? "pro_yearly" : "pro_monthly");
+              startPayment(() => {
+                ensureUserInDB();
+              });
             }}
             disabled={loading}
             className={cn(

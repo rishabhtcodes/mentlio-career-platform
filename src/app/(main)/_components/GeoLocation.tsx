@@ -25,11 +25,11 @@ export default function GetUserLocation() {
           if (error) console.error(error);
         },
         (error) => {
-          console.error("Location permission denied:", error);
+          console.warn("Location permission denied (non-critical):", error);
         }
       );
     } else {
-      console.error("Geolocation not supported by this browser");
+      console.warn("Geolocation not supported by this browser");
     }
   }, []);
 

@@ -65,14 +65,18 @@ export default function MentorConnect() {
   const [exactMatches, setExactMatches] = useState(0);
 
   useEffect(() => {
-    if (!user) return;
     const fetchVideos = async () => {
-      const res = await getRandomMentorVideos();
-      setVideos(res);
-      setLoadingVideo(false);
+      try {
+        const res = await getRandomMentorVideos();
+        setVideos(res);
+      } catch {
+        // non-critical – ignore errors
+      } finally {
+        setLoadingVideo(false);
+      }
     };
     fetchVideos();
-  }, [user]);
+  }, []);
 
   const loadMentors = async (pageNum: number) => {
     setLoadingMentors(true);
