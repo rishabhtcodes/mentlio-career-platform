@@ -46,9 +46,12 @@ next-env.d.ts
 # local reports & audits
 *REPORT*.md
 *COMPARISON*.md
+*AUDIT*.md
 TEST_REPORT.md
 PRODUCTION_READINESS_REPORT.md
 CLARIO_MENTLIO_COMPARISON.md
 MENTLIO_FINAL_AUDIT_REPORT.md
+MENTLIO_PRODUCTION_AUDIT.md
+MENTLIO_LLM_AUDIT.md
 scripts/sync-vercel-env.cjs
 

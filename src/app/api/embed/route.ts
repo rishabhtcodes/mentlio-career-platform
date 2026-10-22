@@ -20,8 +20,23 @@ export async function POST() {
     const chunkedDocs = await textSplitter.splitDocuments(rawDocs);
 
 
+    const geminiKey = process.env.GEMINI_API_KEY;
+    const pineconeKey = process.env.PINECONE_KEY || process.env.PINECONE_API_KEY;
+    const indexName = process.env.PINECONE_INDEX_NAME;
+
+    if (!geminiKey || geminiKey.includes("dummy") || !pineconeKey || pineconeKey.includes("dummy") || !indexName) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Vector embedding requires valid GEMINI_API_KEY, PINECONE_KEY, and PINECONE_INDEX_NAME.",
+          code: "CREDENTIALS_MISSING",
+        },
+        { status: 503 }
+      );
+    }
+
     const embeddings = new GoogleGenerativeAIEmbeddings({
-      apiKey: process.env.GEMINI_API_KEY,
+      apiKey: geminiKey,
       model: "text-embedding-004",
     });
 

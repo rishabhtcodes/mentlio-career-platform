@@ -17,104 +17,89 @@ export async function POST(req: NextRequest) {
       !googleClientId.includes("dummy") &&
       !googleSecret.includes("dummy");
 
-    if (hasLiveGoogle && provider === "google") {
-      const redirectUri = `${req.nextUrl.origin}/api/auth/oauth/callback`;
-      const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${googleClientId}&redirect_uri=${encodeURIComponent(
-        redirectUri
-      )}&response_type=code&scope=openid%20profile%20email&state=${role}`;
-      return NextResponse.json({ url: googleAuthUrl });
-    }
-
-    // Provider details mapping for authentic session creation:
-    const providerKey = (provider || "google").toLowerCase();
-    let authEmail = "google.user@mentlio.local";
-    let authName = "Google Developer";
-    let authAvatar = "/a1.png";
-
-    if (providerKey.includes("discord")) {
-      authEmail = "discord.user@mentlio.local";
-      authName = "Discord Member";
-      authAvatar = "/discord.png";
-    } else if (providerKey.includes("slack")) {
-      authEmail = "slack.user@mentlio.local";
-      authName = "Slack Workspace Colleague";
-      authAvatar = "/slack.png";
-    }
-
-    const userRole = role === "mentor" ? "mentor" : "user";
-    const tableName = userRole === "mentor" ? "mentors" : "users";
-
-    const rows = getTable(tableName);
-    const emailField = userRole === "mentor" ? "email" : "userEmail";
-    let userRecord = rows.find(
-      (r) => String(r[emailField] || "").toLowerCase() === authEmail
-    );
-
-    if (!userRecord) {
-      const id = Date.now();
-      const createdAt = new Date().toISOString();
-
-      if (userRole === "mentor") {
-        userRecord = {
-          id: `mentor-${id}`,
-          full_name: authName,
-          email: authEmail,
-          phone: null,
-          linkedin: null,
-          bio: null,
-          expertise: ["AI", "Career Navigation"],
-          current_position: `${provider.toUpperCase()} Mentor Specialist`,
-          availability: true,
-          rating: 5.0,
-          avatar: authAvatar,
-          created_at: createdAt,
-          is_verified: true,
-          video_url: null,
-        };
-      } else {
-        userRecord = {
-          id,
-          userName: authName,
-          userEmail: authEmail,
-          avatar: authAvatar,
-          created_at: createdAt,
-          totalCredits: 10,
-          remainingCredits: 10,
-          invite_link: uuidv4(),
-          current_status: "Student",
-          userPhone: "",
-          institutionName: `${provider.toUpperCase()} Academy`,
-          mainFocus: "Software Engineering",
-          is_verified: true,
-          isQuizDone: false,
-          latitude: 0,
-          longitude: 0,
-          isPro: true,
-          google_refresh_token: "",
-        };
+    if (provider === "google") {
+      if (hasLiveGoogle) {
+        const redirectUri = `${req.nextUrl.origin}/api/auth/oauth/callback`;
+        const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${googleClientId}&redirect_uri=${encodeURIComponent(
+          redirectUri
+        )}&response_type=code&scope=openid%20profile%20email&state=${role}`;
+        return NextResponse.json({ url: googleAuthUrl });
       }
 
-      mutateTable(tableName, (items) => [...items, userRecord!]);
+      return NextResponse.json(
+        {
+          error:
+            "Google OAuth is not configured on this environment. Missing GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.",
+          code: "OAUTH_PROVIDER_UNCONFIGURED",
+          provider: "google",
+        },
+        { status: 501 }
+      );
     }
 
-    const userId = String(userRecord!.id);
-    const token = createSessionToken({
-      userId,
-      email: authEmail,
-      role: userRole,
-    });
+    if (provider === "discord") {
+      const discordClientId = process.env.DISCORD_CLIENT_ID;
+      const discordSecret = process.env.DISCORD_SECRET || process.env.DISCORD_CLIENT_SECRET;
+      const hasLiveDiscord =
+        discordClientId &&
+        discordSecret &&
+        !discordClientId.includes("dummy") &&
+        !discordSecret.includes("dummy");
 
-    await setServerSessionCookie(token);
+      if (hasLiveDiscord) {
+        const redirectUri = `${req.nextUrl.origin}/api/auth/oauth/discord/callback`;
+        const discordAuthUrl = `https://discord.com/api/oauth2/authorize?client_id=${discordClientId}&redirect_uri=${encodeURIComponent(
+          redirectUri
+        )}&response_type=code&scope=identify%20email&state=${role}`;
+        return NextResponse.json({ url: discordAuthUrl });
+      }
 
-    const redirectPath = userRole === "mentor" ? "/auth-mentor/callback" : "/auth/callback";
+      return NextResponse.json(
+        {
+          error:
+            "Discord OAuth is not configured on this environment. Missing DISCORD_CLIENT_ID and DISCORD_SECRET.",
+          code: "OAUTH_PROVIDER_UNCONFIGURED",
+          provider: "discord",
+        },
+        { status: 501 }
+      );
+    }
 
-    return NextResponse.json({
-      url: redirectPath,
-      user: userRecord,
-      session: {
-        access_token: token,
+    if (provider === "slack_oidc" || provider === "slack") {
+      const slackClientId = process.env.SLACK_CLIENT_ID;
+      const slackSecret = process.env.SLACK_CLIENT_SECRET;
+      const hasLiveSlack =
+        slackClientId &&
+        slackSecret &&
+        !slackClientId.includes("dummy") &&
+        !slackSecret.includes("dummy");
+
+      if (hasLiveSlack) {
+        const redirectUri = `${req.nextUrl.origin}/api/auth/oauth/slack/callback`;
+        const slackAuthUrl = `https://slack.com/openid/connect/authorize?client_id=${slackClientId}&redirect_uri=${encodeURIComponent(
+          redirectUri
+        )}&response_type=code&scope=openid%20profile%20email&state=${role}`;
+        return NextResponse.json({ url: slackAuthUrl });
+      }
+
+      return NextResponse.json(
+        {
+          error:
+            "Slack OAuth is not configured on this environment. Missing SLACK_CLIENT_ID and SLACK_CLIENT_SECRET.",
+          code: "OAUTH_PROVIDER_UNCONFIGURED",
+          provider: "slack",
+        },
+        { status: 501 }
+      );
+    }
+
+    return NextResponse.json(
+      {
+        error: `Unsupported authentication provider: ${provider}`,
+        code: "INVALID_PROVIDER",
       },
-    });
+      { status: 400 }
+    );
   } catch (err: any) {
     console.error("OAuth error:", err);
     return NextResponse.json(

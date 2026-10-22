@@ -9,7 +9,8 @@ import { retrivalServer } from "./pineconeQuery";
 import { toast } from "sonner";
 // import { tavilySearching } from "./tavily";
 
-const ai = new GoogleGenAI({ apiKey: process.env.NEXT_PUBLIC_GEMINI_API_KEY! });
+const geminiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY || "";
+const ai = new GoogleGenAI({ apiKey: geminiKey || "unconfigured-client-key" });
 
 type AgentContext = {
   question: string;

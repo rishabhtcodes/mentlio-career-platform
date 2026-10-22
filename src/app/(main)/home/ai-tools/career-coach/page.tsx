@@ -145,10 +145,25 @@ const CareerCoach = () => {
 
       ctx.stream = quizStream;
 
-      // console.log("Context passing to AI:", ctx);
+      const coachRes = await fetch("/api/ai/career-coach", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          question: userInput,
+          userName: user?.userName,
+          user_current_status: user?.current_status,
+          stream: quizStream,
+          careerOptions: careerSkillOptions.join(", "),
+          summary: quizSummary,
+        }),
+      });
 
-      const aiReply = await runAgent(ctx);
-      console.log("AI Reply:---------->", aiReply);
+      const coachData = await coachRes.json();
+      if (!coachRes.ok) {
+        throw new Error(coachData.error || "Failed to generate coaching response");
+      }
+
+      const aiReply = coachData.reply;
 
       const aiMessage: Message = {
         role: "ai",

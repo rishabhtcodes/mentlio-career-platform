@@ -93,7 +93,19 @@ const localSupabaseFetch: typeof fetch = async (input, init) => {
         body: JSON.stringify({ provider, role }),
       });
       const data = await res.json();
-      if (data.url) {
+      if (!res.ok) {
+        return new Response(
+          JSON.stringify({
+            msg: data.error || "OAuth provider not configured",
+            error_description: data.error || "OAuth provider not configured",
+          }),
+          {
+            status: res.status,
+            headers: { "Content-Type": "application/json" },
+          }
+        );
+      }
+      if (data.url && (data.url.startsWith("https://") || data.url.startsWith("http://"))) {
         window.location.href = data.url;
       }
       return new Response(JSON.stringify(data), {

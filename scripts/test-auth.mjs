@@ -1,5 +1,5 @@
 // Automated Authentication Test Suite for Mentlio / Clarioo
-const BASE_URL = "http://localhost:3000";
+const BASE_URL = process.env.TEST_BASE_URL || "http://localhost:3000";
 
 let testPassCount = 0;
 let testFailCount = 0;
@@ -119,16 +119,33 @@ async function runTests() {
   const data9 = await res9.json();
   assert(data9.user === null, "Rejects cryptographically tampered session token");
 
-  // TEST 10: Google OAuth flow execution
-  console.log("\nTest 10: Google OAuth authentication initiation");
+  // TEST 10: Security: Unconfigured OAuth provider rejection (no fake sessions)
+  console.log("\nTest 10: Security: Unconfigured OAuth provider rejection");
   const res10 = await fetch(`${BASE_URL}/api/auth/oauth`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ provider: "google" }),
   });
   const data10 = await res10.json();
-  assert(res10.status === 200, "OAuth endpoint returns status 200");
-  assert(data10.url && data10.url.includes("callback"), "OAuth generates valid callback redirection path");
+  // In dev/test without live Google credentials, must reject with 501
+  if (process.env.GOOGLE_CLIENT_ID && !process.env.GOOGLE_CLIENT_ID.includes("dummy")) {
+    assert(res10.status === 200 && data10.url?.includes("accounts.google.com"), "Redirects to live Google auth");
+  } else {
+    assert(res10.status === 501, "Safely rejects unconfigured Google OAuth with 501");
+    assert(data10.code === "OAUTH_PROVIDER_UNCONFIGURED", "Returns OAUTH_PROVIDER_UNCONFIGURED code");
+    assert(!data10.session, "Never produces a session for unconfigured OAuth");
+  }
+
+  // TEST 10b: Security: Unsupported OAuth provider rejection
+  console.log("\nTest 10b: Security: Unsupported OAuth provider rejection");
+  const res10b = await fetch(`${BASE_URL}/api/auth/oauth`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ provider: "unsupported_provider_xyz" }),
+  });
+  const data10b = await res10b.json();
+  assert(res10b.status === 400, "Rejects unsupported provider with status 400");
+  assert(data10b.code === "INVALID_PROVIDER", "Returns INVALID_PROVIDER error code");
 
   // TEST 11: Logout session invalidation
   console.log("\nTest 11: Logout & session invalidation");
