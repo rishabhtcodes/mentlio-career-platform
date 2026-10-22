@@ -85,10 +85,12 @@ const localSupabaseFetch: typeof fetch = async (input, init) => {
     }
 
     if (url.pathname.includes("/auth/v1/authorize")) {
+      const provider = url.searchParams.get("provider") || "google";
+      const role = url.searchParams.get("role") || "user";
       const res = await fetch("/api/auth/oauth", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ provider: "google" }),
+        body: JSON.stringify({ provider, role }),
       });
       const data = await res.json();
       if (data.url) {

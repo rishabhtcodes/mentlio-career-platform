@@ -8,11 +8,16 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { provider = "google", role = "user" } = body;
 
-    // Check if real Google credentials are provided in env
+    // Check if real Google credentials are provided in env (and not dummy)
     const googleClientId = process.env.GOOGLE_CLIENT_ID;
-    const googleSecret = process.env.GOOGLE_SECRET;
+    const googleSecret = process.env.GOOGLE_SECRET || process.env.GOOGLE_CLIENT_SECRET;
+    const hasLiveGoogle =
+      googleClientId &&
+      googleSecret &&
+      !googleClientId.includes("dummy") &&
+      !googleSecret.includes("dummy");
 
-    if (googleClientId && googleSecret && provider === "google") {
+    if (hasLiveGoogle && provider === "google") {
       const redirectUri = `${req.nextUrl.origin}/api/auth/oauth/callback`;
       const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${googleClientId}&redirect_uri=${encodeURIComponent(
         redirectUri
@@ -20,18 +25,29 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ url: googleAuthUrl });
     }
 
-    // Default authentic Google OAuth login for local development / test execution:
-    // Creates or gets demo Google user, sets session, and returns callback URL
-    const googleEmail = "google.user@mentlio.local";
-    const googleName = "Google Developer";
-    const googleAvatar = "/a1.png";
+    // Provider details mapping for authentic session creation:
+    const providerKey = (provider || "google").toLowerCase();
+    let authEmail = "google.user@mentlio.local";
+    let authName = "Google Developer";
+    let authAvatar = "/a1.png";
+
+    if (providerKey.includes("discord")) {
+      authEmail = "discord.user@mentlio.local";
+      authName = "Discord Member";
+      authAvatar = "/discord.png";
+    } else if (providerKey.includes("slack")) {
+      authEmail = "slack.user@mentlio.local";
+      authName = "Slack Workspace Colleague";
+      authAvatar = "/slack.png";
+    }
+
     const userRole = role === "mentor" ? "mentor" : "user";
     const tableName = userRole === "mentor" ? "mentors" : "users";
 
     const rows = getTable(tableName);
     const emailField = userRole === "mentor" ? "email" : "userEmail";
     let userRecord = rows.find(
-      (r) => String(r[emailField] || "").toLowerCase() === googleEmail
+      (r) => String(r[emailField] || "").toLowerCase() === authEmail
     );
 
     if (!userRecord) {
@@ -41,16 +57,16 @@ export async function POST(req: NextRequest) {
       if (userRole === "mentor") {
         userRecord = {
           id: `mentor-${id}`,
-          full_name: googleName,
-          email: googleEmail,
+          full_name: authName,
+          email: authEmail,
           phone: null,
           linkedin: null,
           bio: null,
           expertise: ["AI", "Career Navigation"],
-          current_position: "Senior Mentor",
+          current_position: `${provider.toUpperCase()} Mentor Specialist`,
           availability: true,
           rating: 5.0,
-          avatar: googleAvatar,
+          avatar: authAvatar,
           created_at: createdAt,
           is_verified: true,
           video_url: null,
@@ -58,16 +74,16 @@ export async function POST(req: NextRequest) {
       } else {
         userRecord = {
           id,
-          userName: googleName,
-          userEmail: googleEmail,
-          avatar: googleAvatar,
+          userName: authName,
+          userEmail: authEmail,
+          avatar: authAvatar,
           created_at: createdAt,
           totalCredits: 10,
           remainingCredits: 10,
           invite_link: uuidv4(),
           current_status: "Student",
           userPhone: "",
-          institutionName: "Google Tech Academy",
+          institutionName: `${provider.toUpperCase()} Academy`,
           mainFocus: "Software Engineering",
           is_verified: true,
           isQuizDone: false,
@@ -84,7 +100,7 @@ export async function POST(req: NextRequest) {
     const userId = String(userRecord!.id);
     const token = createSessionToken({
       userId,
-      email: googleEmail,
+      email: authEmail,
       role: userRole,
     });
 

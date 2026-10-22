@@ -67,16 +67,38 @@ const DEFAULT_DB: DatabaseSchema = {
   orders: [],
 };
 
+function getStoragePath(): string {
+  // If running in Vercel/AWS Lambda serverless environment, process.cwd() is read-only.
+  // We use /tmp/mentlio.json for writable persistence across warm lambdas, seeded from bundled DB.
+  if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+    const tmpFile = path.join("/tmp", "mentlio.json");
+    if (!fs.existsSync(tmpFile)) {
+      try {
+        if (fs.existsSync(DB_FILE)) {
+          fs.copyFileSync(DB_FILE, tmpFile);
+        } else {
+          fs.writeFileSync(tmpFile, JSON.stringify(DEFAULT_DB, null, 2), "utf8");
+        }
+      } catch (err) {
+        console.error("Error initializing /tmp/mentlio.json:", err);
+      }
+    }
+    return tmpFile;
+  }
+  return DB_FILE;
+}
+
 function ensureDbFile(): DatabaseSchema {
   try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-    if (!fs.existsSync(DB_FILE)) {
-      fs.writeFileSync(DB_FILE, JSON.stringify(DEFAULT_DB, null, 2), "utf8");
+    const targetFile = getStoragePath();
+    if (!fs.existsSync(targetFile)) {
+      if (!fs.existsSync(path.dirname(targetFile))) {
+        fs.mkdirSync(path.dirname(targetFile), { recursive: true });
+      }
+      fs.writeFileSync(targetFile, JSON.stringify(DEFAULT_DB, null, 2), "utf8");
       return DEFAULT_DB;
     }
-    let raw = fs.readFileSync(DB_FILE, "utf8");
+    let raw = fs.readFileSync(targetFile, "utf8");
     if (raw.charCodeAt(0) === 0xFEFF) {
       raw = raw.slice(1);
     }
@@ -93,12 +115,14 @@ export function readDb(): DatabaseSchema {
 
 export function writeDb(data: DatabaseSchema): void {
   try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
+    const targetFile = getStoragePath();
+    const targetDir = path.dirname(targetFile);
+    if (!fs.existsSync(targetDir)) {
+      fs.mkdirSync(targetDir, { recursive: true });
     }
-    const tempFile = `${DB_FILE}.tmp`;
+    const tempFile = `${targetFile}.tmp`;
     fs.writeFileSync(tempFile, JSON.stringify(data, null, 2), "utf8");
-    fs.renameSync(tempFile, DB_FILE);
+    fs.renameSync(tempFile, targetFile);
   } catch (err) {
     console.error("Error writing database file:", err);
   }

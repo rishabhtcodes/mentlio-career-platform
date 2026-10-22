@@ -105,7 +105,6 @@ ${formatInstructions}
 `;
 
     const firstResponse = await model.invoke(firstPrompt);
-    // Try to repair raw JSON from first LLM
     let repairedJSON: string;
     try {
       repairedJSON = jsonrepair(firstResponse.content as string);
@@ -113,59 +112,18 @@ ${formatInstructions}
       repairedJSON = firstResponse.content as string;
     }
 
-    // console.log("First LLM raw (possibly incomplete):", repairedJSON);
-
-    // Second LLM to check and complete if necessary
-    const secondPrompt = `
-Here is the generated roadmap JSON for "${field}" for "${timeline}" in "${mode}" mode:
-${repairedJSON}
-
-Validate and repair the roadmap if needed. The JSON must satisfy ALL these conditions:
-
-1. Has a meaningful roadmapTitle, description, and duration.
-2. initialNodes:
-   - topics aligned to "${mode}" difficulty
-   - Contains 5-8 topics (2-3 basics, 2-3 intermediate, 1-2 advanced).
-   - Each node must have:
-     • id (unique string)
-     • type ("default")
-     • position with numeric x, y
-     • data containing:
-       - title (short topic name)
-       - description (1-2 lines explanation)
-       - link (learning resource)
-3. initialEdges:
-   - All nodes are connected in a clear logical sequence (basics → intermediate → advanced).
-   - Each edge has id, source, and target matching valid node ids.
-4. Content is concise, useful, and relevant to the "${field}" roadmap.
-
-Rules:
-- If the JSON already satisfies all requirements, return it unchanged.
-- If anything is missing, incomplete, or poorly structured, correct it while keeping the original intent.
-- Do NOT add extra commentary or text outside of JSON.
-- Output must be valid JSON only, strictly following the schema.
-
-${formatInstructions}
-`;
-
-    const secondResponse = await model.invoke(secondPrompt);
-
-    // Repair second JSON before parsing
-    let secondRepairedJSON: string;
+    let finalParsed: any;
     try {
-      secondRepairedJSON = jsonrepair(secondResponse.content as string);
-    } catch (repairErr) {
-      console.warn(
-        "Second JSON repair failed, using raw LLM output",
-        repairErr
-      );
-      secondRepairedJSON = secondResponse.content as string; // fallback
+      finalParsed = await parser.parse(repairedJSON);
+    } catch (parseErr) {
+      console.warn("First parser attempt failed, trying fallback extraction...", parseErr);
+      const jsonMatch = repairedJSON.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        finalParsed = JSON.parse(jsonMatch[0]);
+      } else {
+        throw parseErr;
+      }
     }
-
-    // Parse second response
-    const finalParsed = await parser.parse(secondRepairedJSON);
-
-    // console.log("Final Parsed Roadmap from second LLM:", finalParsed);
 
     return NextResponse.json(finalParsed);
   } catch (error: any) {
