@@ -242,12 +242,14 @@ Summary only; details and residual risk are in `MENTLIO_FINAL_AUDIT.md`.
 | Production build | PASS (with the new `SESSION_SECRET`) |
 | Security headers served | PASS (curl on `/web`) |
 | Career board unlocks for the QA student after the provider fix | PASS |
-| Live production site re-verified after the fixes | NOT TESTED — fixes are not deployed; deployment would need explicit authorization |
+| Live production site re-verified after the fixes | PASS — deployed as `f3a2f84`, re-verified as `cd6fc38` |
 | Exact deployment steps | Listed in `MENTLIO_FINAL_AUDIT.md` §6 |
 
 ### Live production audit (https://mentlio-career-platform.vercel.app/, 2026-10-24)
 
 **Re-verified after deployment `f3a2f84` at 07:27.** The live site now runs the fixed build. `/api/colleges` reports an explicit 503, anonymous data/AI calls are rejected, login errors are generic, mentor PII is redacted, and the UI login lands on `/auth/callback`. `npm run test:live` → **9/9 PASS** (9 passed, 0 failed, 0 skipped).
+
+**Re-verified again after deployment `cd6fc38` at 07:41** (documentation-only commit): `npm run test:live` → 9/9 PASS, plus live signup → login → `/api/auth/session` returns the created account and browser login lands on `/auth/callback`.
 
 | Probe | Live result | Status |
 |---|---|---|

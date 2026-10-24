@@ -124,7 +124,7 @@ Still open:
    node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
    vercel env add SESSION_SECRET production
    ```
-   Without it, `next.config.ts` generates a random per-build secret, so the build succeeds and auth stays closed; the only cost is that every deployment invalidates existing sessions and starts from an empty `/tmp` store. **Live since `f3a2f84`:** deployment succeeded at 2026-10-24 07:27 and `npm run test:live` passes 9/9, including browser login. Set the variable now so the next deployment does not sign everyone out.
+   Without it, `next.config.ts` generates a random per-build secret, so the build succeeds and auth stays closed; the only cost is that every deployment invalidates existing sessions and starts from an empty `/tmp` store. **Live since `f3a2f84`:** deployment succeeded at 2026-10-24 07:27 and `npm run test:live` passes 9/9, including browser login. The current deployment is `cd6fc38` (docs only, 07:41) and was re-verified 9/9 with signup/login/session and browser login. Set the variable now so the next deployment does not sign everyone out.
 3. **Provider credentials** (set only when each feature is wanted; all fail honestly otherwise):
 
    | Feature | Variables |
