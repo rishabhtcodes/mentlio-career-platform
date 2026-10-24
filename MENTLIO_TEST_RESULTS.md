@@ -205,8 +205,10 @@ No real user records were deleted at any point. QA fixtures are namespaced (`qa_
 | Targeted lint | `npx eslint <changed files>` | PASS — 0 errors, 2 warnings (existing `no-img-element` in course thumbnails, exhaustive-deps in the quiz provider) |
 | Full-repo lint | `npm run lint` | BLOCKED (environment OOM, baseline limitation) |
 | Production build | `npm run build` | PASS — complete route table, all pages compiled |
+| Production-mode suites | auth/security/functional against `next start` | PASS — 24/24, 51/51, 43/43 |
+| Live security probe | `npm run test:live` | PASS locally (9/9); FAIL against the stale live build (expected until redeploy) |
 
-`npm test` now runs auth → security → functional → LLM.
+`npm test` now runs auth → security → functional → LLM. `npm run test:live` is a read-only probe of a deployed URL (headers, anonymous data access, mentor PII, login enumeration, anonymous AI, college-search error shape) and exits non-zero if the deployment predates these fixes.
 
 ---
 

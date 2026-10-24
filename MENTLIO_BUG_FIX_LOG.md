@@ -253,6 +253,11 @@ Status legend: FIXED — RETESTED / FIXED — pending retest / BLOCKED
 - **Fix:** the route now rejects a missing/placeholder key before calling the provider with `503 SEARCH_PROVIDER_UNCONFIGURED`, maps a rejected key to `503 SEARCH_PROVIDER_INVALID_KEY`, and returns a JSON error (not an empty array) for genuine failures.
 - **Retest:** local endpoint → 503 `SEARCH_PROVIDER_UNCONFIGURED`; `npx tsc --noEmit` clean.
 
+### 52. Anonymous callers could scrape mentor email addresses — FIXED — RETESTED
+- **Repro:** `GET /api/data/mentors?select=*` without a session returned rows containing `email` (the old live build also returned `phone`). The directory is public so any scraper could harvest all mentor addresses.
+- **Fix:** public reads still redact `phone`; `email` is now removed from responses without a session, while signed-in students keep it on the mentor detail page where it is displayed.
+- **Retest:** anonymous → no `phone`/`email`; authenticated student → `email` present; security suite 51/51 and functional suite 43/43 pass against the production build.
+
 ### Production deployment finding (2026-10-24) — BLOCKED on Vercel environment
 - The live site is still the 2026-10-22 deployment. Pushes of `b8ccdbc` (`dpl_F934uwxuU23fvs1VHqRtKn6qysGT`) and `472d5a8` (`dpl_7Tp9R8SH3xSCuvvE1SSN6NDU4jSw`) both produced failed Vercel deployments because production now fails closed when `SESSION_SECRET` is absent/short. The previous build escaped this by signing sessions with a secret hardcoded in a public repository.
 - **Root cause reproduced locally** by running the production build with an empty secret: it compiles, then dies while collecting page data with `Error: SESSION_SECRET is missing or shorter than 32 characters ... Failed to collect page data for /api/auth/signup`. Local builds pass only because `.env.local` supplies the value.

@@ -334,6 +334,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ tabl
       rows = rows.map((r) => {
         const copy = { ...r };
         for (const f of PUBLIC_REDACTED_FIELDS) delete copy[f];
+        // Mentor email is the contact shown on the signed-in detail page. Keep
+        // it out of anonymous responses so the public directory cannot be
+        // scraped for addresses.
+        if (!session) delete copy.email;
         return copy;
       });
     }
