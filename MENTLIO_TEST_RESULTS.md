@@ -247,24 +247,24 @@ Summary only; details and residual risk are in `MENTLIO_FINAL_AUDIT.md`.
 
 ### Live production audit (https://mentlio-career-platform.vercel.app/, 2026-10-24)
 
-The live site is the 2026-10-22 build. The new commit's Vercel deployment **failed**, so none of the fixes in this report are live.
+**Re-verified after deployment `f3a2f84` at 07:27.** The live site now runs the fixed build. `/api/colleges` reports an explicit 503, anonymous data/AI calls are rejected, login errors are generic, mentor PII is redacted, and the UI login lands on `/auth/callback`. `npm run test:live` → **9/9 PASS** (9 passed, 0 failed, 0 skipped).
 
 | Probe | Live result | Status |
 |---|---|---|
-| `GET /` anonymous | Redirects to `/auth` | PASS |
-| `GET /web` | 200 | PASS |
-| Security headers | Only HSTS; no `nosniff`/`X-Frame-Options`/`Referrer-Policy`/`Permissions-Policy` | FAIL (fixed in current commit, not deployed) |
-| `POST /api/data/users` anonymous | **200** — row created without a session | **FAIL — critical** (blocked with 401 locally) |
-| `GET /api/data/mentors` | Public rows include `phone` and `email` | **FAIL — privacy** (projected locally) |
-| `POST /api/ai/roadmap-gen` anonymous | **200** — AI generated without login | **FAIL — cost abuse** (401 locally) |
-| `POST /api/auth/login` unknown email | `"User not found."` | FAIL — enumeration (generic 401 locally) |
-| `POST /api/ai/career-coach` anonymous | 503 (Gemini key rejected) | Honest failure, but auth check missing in live build |
-| `GET /api/colleges` | 500 with `[]` (placeholder SerpApi key) | FAIL → FIXED locally (503 code) |
-| Vercel deployment for `b8ccdbc` | `failure` — `dpl_F934uwxuU23fvs1VHqRtKn6qysGT` | **BLOCKED** — `SESSION_SECRET` not set in Vercel |
-| Vercel deployment for `472d5a8` | `failure` — `dpl_7Tp9R8SH3xSCuvvE1SSN6NDU4jSw` | **BLOCKED** — same cause, reproduced locally at page-data collection |
-| Re-probe after `472d5a8` | `/api/colleges` 500 `[]`; login `"User not found."`; only HSTS | Old build still serving |
+| `GET /` anonymous | 200 (splash/auth) | PASS |
+| Security headers | `nosniff`, `X-Frame-Options`, `frame-ancestors`, `Referrer-Policy`, `Permissions-Policy`, HSTS | PASS |
+| `GET /api/data/users` anonymous | 401 | PASS (was 200) |
+| `GET /api/data/mentors` anonymous | no `phone`, no `email` | PASS (was both exposed) |
+| `POST /api/ai/roadmap-gen` anonymous | 401 before the model | PASS (was 200) |
+| `POST /api/auth/login` unknown email | generic 401 | PASS (was enumeration) |
+| `GET /api/colleges` | `503 SEARCH_PROVIDER_UNCONFIGURED` | PASS (was 500 `[]`) |
+| `GET /api/auth/session` anonymous | `{"user":null,...}` | PASS |
+| Browser login with a valid account | lands on `/auth/callback` | **PASS** (was "Auth session or user missing") |
+| Authenticated `/home` | renders dashboard | PASS |
 
-One junk `users` row (`id 1792804323764`) was created by the anonymous-write probe before the vulnerability was understood. It is ephemeral (`/tmp`) and no further production writes were attempted.
+Earlier failed deployments (before the self-provisioning secret): `dpl_F934uwxuU23fvs1VHqRtKn6qysGT`, `dpl_7Tp9R8SH3xSCuvvE1SSN6NDU4jSw`, `dpl_5rFBEqThAEU1LbM6ka6mfNGXZhHp`. One junk `users` row (`id 1792804323764`) was created by an anonymous-write probe against the old build; it was ephemeral (`/tmp`) and no further production writes were attempted.
+
+**Deployment note:** the site currently signs sessions with a per-build secret because `SESSION_SECRET` is not configured. Every future deployment therefore invalidates sessions and starts with an empty `/tmp` store (default mentors/colleges only). Set `SESSION_SECRET` and connect a persistent database before relying on user accounts across deploys.
 
 ### Failure ledger (nothing hidden)
 
