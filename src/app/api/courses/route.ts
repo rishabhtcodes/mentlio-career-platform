@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "@/lib/auth/session";
 import { getJson } from "serpapi";
 
 interface Course {
@@ -14,24 +15,22 @@ interface Course {
 }
 
 export async function GET(req: NextRequest) {
+  const session = await getServerSession();
+  if (!session || !session.userId) {
+    return NextResponse.json(
+      { error: "Authentication required." },
+      { status: 401 }
+    );
+  }
+
   const { searchParams } = new URL(req.url);
-  const query = searchParams.get("q") || "software developer";
+  const query = (searchParams.get("q") || "software developer").slice(0, 120);
 
   if (!process.env.SERPAPI_KEY || process.env.SERPAPI_KEY.includes("dummy")) {
-    return NextResponse.json([
-      {
-        title: "Full-Stack Web Development Bootcamp",
-        link: "https://example.com/course-1",
-        source: "Coursera",
-        snippet: "Master React, Next.js, Node.js, and cloud deployments with interactive projects.",
-      },
-      {
-        title: "Modern TypeScript and Next.js Masterclass",
-        link: "https://example.com/course-2",
-        source: "edX",
-        snippet: "A deep dive into production web applications, server components, and enterprise architecture.",
-      },
-    ]);
+    return NextResponse.json(
+      { error: "Course search is not configured on this server.", code: "SEARCH_PROVIDER_UNCONFIGURED" },
+      { status: 503 }
+    );
   }
 
   try {

@@ -1,11 +1,21 @@
 import { NextResponse } from "next/server";
 import { tavily } from "@tavily/core";
+import { getServerSession } from "@/lib/auth/session";
 
 export async function POST(req: Request) {
   try {
-    const apiKey = process.env.NEXT_PUBLIC_TAVILY_API_KEY || process.env.TAVILY_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json({ error: "TAVILY_API_KEY is not configured." }, { status: 500 });
+    const session = await getServerSession();
+    if (!session) {
+      return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+    }
+    // Server-only variable first: the Tavily key must never need a NEXT_PUBLIC_
+    // variant, which would publish it into the browser bundle.
+    const apiKey = process.env.TAVILY_API_KEY || process.env.NEXT_PUBLIC_TAVILY_API_KEY;
+    if (!apiKey || apiKey.includes("dummy")) {
+      return NextResponse.json(
+        { error: "Tavily search is not configured.", code: "TAVILY_UNCONFIGURED" },
+        { status: 503 }
+      );
     }
 
     const tvly = tavily({ apiKey });

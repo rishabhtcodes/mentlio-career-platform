@@ -332,6 +332,7 @@ export function AppSidebar() {
               <div className="flex flex-col gap-1">
                 <Button
                   variant="ghost"
+                  onClick={() => router.push("/home/settings/billing")}
                   className="justify-start gap-2 w-full font-roboto hover:bg-gray-50 rounded-none cursor-pointer"
                 >
                   <LuArrowUpRight className="text-[18px]" />
@@ -349,9 +350,6 @@ export function AppSidebar() {
                     <LuSettings className="text-[18px]" />
                     Profile
                   </div>
-                  <kbd className="text-xs text-muted-foreground bg-muted px-1 py-0.5 rounded">
-                    Ctrl+Alt+P
-                  </kbd>
                 </Button>
 
                 <Button
@@ -365,15 +363,13 @@ export function AppSidebar() {
 
                 <Button
                   variant="ghost"
+                  onClick={() => router.push("/home/ai-tools/career-coach")}
                   className="justify-between w-full font-roboto hover:bg-gray-50 rounded-none cursor-pointer"
                 >
                   <div className="flex gap-2 items-center">
                     <Stars className="text-[18px]" />
                     Ai Assistant
                   </div>
-                  <kbd className="text-xs text-muted-foreground bg-muted px-1 py-0.5 rounded">
-                    Ctrl+Alt+D
-                  </kbd>
                 </Button>
 
                 <Separator />

@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createSessionToken, setServerSessionCookie } from "@/lib/auth/session";
-import { getTable, mutateTable } from "@/lib/auth/db";
-import { v4 as uuidv4 } from "uuid";
+import { createOAuthState, OAUTH_STATE_COOKIE, oauthStateCookieOptions } from "@/lib/auth/oauth-callback";
 
 export async function POST(req: NextRequest) {
   try {
@@ -19,11 +17,14 @@ export async function POST(req: NextRequest) {
 
     if (provider === "google") {
       if (hasLiveGoogle) {
-        const redirectUri = `${req.nextUrl.origin}/api/auth/oauth/callback`;
+        const redirectUri = `${req.nextUrl.origin}/api/auth/oauth/google/callback`;
+        const state = createOAuthState(role);
         const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${googleClientId}&redirect_uri=${encodeURIComponent(
           redirectUri
-        )}&response_type=code&scope=openid%20profile%20email&state=${role}`;
-        return NextResponse.json({ url: googleAuthUrl });
+        )}&response_type=code&scope=openid%20profile%20email&state=${encodeURIComponent(state)}`;
+        const res = NextResponse.json({ url: googleAuthUrl });
+        res.cookies.set(OAUTH_STATE_COOKIE, state, oauthStateCookieOptions);
+        return res;
       }
 
       return NextResponse.json(
@@ -48,16 +49,19 @@ export async function POST(req: NextRequest) {
 
       if (hasLiveDiscord) {
         const redirectUri = `${req.nextUrl.origin}/api/auth/oauth/discord/callback`;
+        const state = createOAuthState(role);
         const discordAuthUrl = `https://discord.com/api/oauth2/authorize?client_id=${discordClientId}&redirect_uri=${encodeURIComponent(
           redirectUri
-        )}&response_type=code&scope=identify%20email&state=${role}`;
-        return NextResponse.json({ url: discordAuthUrl });
+        )}&response_type=code&scope=identify%20email&state=${encodeURIComponent(state)}`;
+        const res = NextResponse.json({ url: discordAuthUrl });
+        res.cookies.set(OAUTH_STATE_COOKIE, state, oauthStateCookieOptions);
+        return res;
       }
 
       return NextResponse.json(
         {
           error:
-            "Discord OAuth is not configured on this environment. Missing DISCORD_CLIENT_ID and DISCORD_SECRET.",
+            "Discord OAuth is not configured on this environment. Missing DISCORD_CLIENT_ID and DISCORD_CLIENT_SECRET.",
           code: "OAUTH_PROVIDER_UNCONFIGURED",
           provider: "discord",
         },
@@ -76,10 +80,13 @@ export async function POST(req: NextRequest) {
 
       if (hasLiveSlack) {
         const redirectUri = `${req.nextUrl.origin}/api/auth/oauth/slack/callback`;
+        const state = createOAuthState(role);
         const slackAuthUrl = `https://slack.com/openid/connect/authorize?client_id=${slackClientId}&redirect_uri=${encodeURIComponent(
           redirectUri
-        )}&response_type=code&scope=openid%20profile%20email&state=${role}`;
-        return NextResponse.json({ url: slackAuthUrl });
+        )}&response_type=code&scope=openid%20profile%20email&state=${encodeURIComponent(state)}`;
+        const res = NextResponse.json({ url: slackAuthUrl });
+        res.cookies.set(OAUTH_STATE_COOKIE, state, oauthStateCookieOptions);
+        return res;
       }
 
       return NextResponse.json(

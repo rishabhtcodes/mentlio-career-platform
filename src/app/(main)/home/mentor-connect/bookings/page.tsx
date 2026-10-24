@@ -1,6 +1,7 @@
 "use client";
 import SingleCard from "@/app/(main)/_components/Mentor-card";
 import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import React, { use, useEffect, useMemo, useState } from "react";
 import { LuChevronLeft, LuGhost, LuVideo } from "react-icons/lu";
@@ -46,9 +47,15 @@ const Bookings = () => {
     setLoading(false);
   };
 
+  // user comes from an async context, so this must re-run once the signed-in
+  // student is known. With [] deps it queried student_id = undefined and the
+  // list stayed empty even though bookings existed.
   useEffect(() => {
+    if (!user?.id) return;
     fetchInitial();
+  }, [user?.id]);
 
+  useEffect(() => {
     // Real-time subscription: listen for INSERT / UPDATE / DELETE
     const channel = supabase
       .channel("public:mentor_sessions")
@@ -109,9 +116,14 @@ const Bookings = () => {
       <SingleCard />
 
       <div className="mt-4 flex items-center  w-full">
-        <p className="text-sm font-inter ml-5 cursor-pointer ">
-          <LuChevronLeft className="inline mr-2" /> Back
-        </p>
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={() => router.push("/home/mentor-connect")}
+          className="text-sm font-inter ml-5 h-auto gap-1 px-1 text-black hover:bg-transparent"
+        >
+          <LuChevronLeft size={18} /> Back
+        </Button>
 
         <h2 className="font-inter text-2xl font-semibold text-center mx-auto">
           My Bookings

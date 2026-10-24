@@ -7,7 +7,6 @@ import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import {
   Delete,
   Edit,
-  Filter,
   Icon,
   Info,
   InfoIcon,
@@ -395,18 +394,19 @@ const JobTracker = () => {
           {/* <p className="font-inter tracking-tight text-sm">
             Bring jobs from career board to your job tracker
           </p> */}
-          <Button variant="outline" className="font-inter text-sm">
+          <Button
+            variant="outline"
+            onClick={() => router.push("/home/career-board")}
+            className="font-inter text-sm"
+          >
             <LuBookMarked className="w-4 h-4 mr-2" />
             Career Board
           </Button>
         </div>
-        <Button variant="outline" className="font-inter text-sm ml-auto">
-          <Filter className="w-4 h-4 mr-2" />
-          Filter
-        </Button>
         <Button
           variant="outline"
           className="font-inter text-sm bg-gradient-to-br from-blue-300 to-blue-500 text-white"
+          onClick={() => setOpen(true)}
         >
           Add <LuCircleFadingPlus className="w-4 h-4 ml-2" />
         </Button>

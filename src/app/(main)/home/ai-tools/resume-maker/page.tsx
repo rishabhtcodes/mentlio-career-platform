@@ -22,6 +22,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { useResumeStore } from "@/lib/store/useResumeStore";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 const ResumeMaker = () => {
   // ===============================================
@@ -30,6 +31,7 @@ const ResumeMaker = () => {
   const [resumeTitle, setResumeTitle] = useState("");
 
   const setTitle = useResumeStore((state) => state.setTitle);
+  const resume = useResumeStore((state) => state.resume);
   const router = useRouter();
 
   const handleContinue = () => {
@@ -65,9 +67,13 @@ const ResumeMaker = () => {
            <Button
             className="font-inter text-sm tracking-tight mt-5 flex items-center justify-center w-full"
             variant="outline"
-            onClick={() => setOpen(true)}
+            onClick={() =>
+              toast.info(
+                "AI resume generation isn't available yet. Use 'Get Started' to build one in the editor."
+              )
+            }
           >
-            Generate <LuCircleFadingPlus />
+            Generate <LuBrain className="ml-1" />
           </Button>
         </div>
         <Separator orientation="vertical" className="mx-4 bg-gray-300" />
@@ -76,6 +82,32 @@ const ResumeMaker = () => {
           <h1 className="font-inter text-lg font-semibold tracking-tight">
             Recent Created Resume <LuActivity className="inline ml-2" />
           </h1>
+          {resume.title.trim() ? (
+            <div className="mt-5 w-full max-w-md rounded-lg border bg-white p-4">
+              <p className="font-inter text-base font-medium truncate">
+                {resume.title}
+              </p>
+              <p className="font-inter text-xs text-gray-500 mt-1">
+                {resume.bio.name
+                  ? `${resume.bio.name}${resume.bio.email ? ` · ${resume.bio.email}` : ""}`
+                  : "Draft — details not filled in yet"}
+              </p>
+              <Button
+                className="mt-3 font-inter text-sm cursor-pointer"
+                variant="outline"
+                onClick={() =>
+                  router.push("/home/ai-tools/resume-maker/start")
+                }
+              >
+                Open <LuChevronRight className="ml-1" />
+              </Button>
+            </div>
+          ) : (
+            <p className="mt-5 font-inter text-sm text-gray-500 max-w-md">
+              No resumes yet. Create one with "Get Started" — your draft is saved
+              in this browser as you type.
+            </p>
+          )}
         </div>
       </div>
 

@@ -33,9 +33,9 @@ const Dashbaord = () => {
 
   return (
     <div className="flex flex-col px-4 pb-20">
-      <div className="flex gap-4 py-6  bg-gray-50 ">
+      <div className="flex flex-col gap-6 py-6 bg-gray-50 lg:flex-row lg:gap-4">
         {/* LEFT SIDE CONTENT */}
-        <div className="w-[72%] mx-auto">
+        <div className="w-full mx-auto lg:w-[72%]">
           {/* Welcome box */}
           <SingleCard />
           {/* 3 boxes  */}
@@ -44,11 +44,11 @@ const Dashbaord = () => {
           <MeetingsChart />
         </div>
         {/* Right side */}
-        <div className="w-[28%] mx-auto">
+        <div className="w-full mx-auto lg:w-[28%]">
           <div className="max-w-[300px] mx-auto">
             <HomeCalendar />
           </div>
-          <div className="bg-white w-full p-4 mt-16 h-[400px] overflow-y-scroll  rounded-md border">
+          <div className="bg-white w-full p-4 mt-6 lg:mt-16 h-[400px] overflow-y-scroll  rounded-md border">
             <h2 className="text-center font-sora text-xl">Messages</h2>
             <MentorMessagesList />
           </div>

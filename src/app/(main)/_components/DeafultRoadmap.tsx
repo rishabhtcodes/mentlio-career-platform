@@ -93,7 +93,7 @@ const DefaultRoadmap: React.FC<DefaultRoadmapProps> = ({
             Complete your quiz first
           </h1>
           <p className="font-inter text-lg px-20 text-center mt-2">
-            Complete quiz to get personlaised interest and roadmap aligned with
+            Complete quiz to get personalised interest and roadmap aligned with
             our goals.
           </p>
           <Button

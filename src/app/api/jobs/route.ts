@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "@/lib/auth/session";
 import { getJson } from "serpapi";
 
 interface Job {
@@ -12,28 +13,22 @@ interface Job {
 }
 
 export async function GET(req: NextRequest) {
+  const session = await getServerSession();
+  if (!session || !session.userId) {
+    return NextResponse.json(
+      { error: "Authentication required." },
+      { status: 401 }
+    );
+  }
+
   const { searchParams } = new URL(req.url);
-  const query = searchParams.get("q") || "software developer";
+  const query = (searchParams.get("q") || "software developer").slice(0, 120);
 
   if (!process.env.SERPAPI_KEY || process.env.SERPAPI_KEY.includes("dummy")) {
-    return NextResponse.json([
-      {
-        title: "Frontend Developer (React / Next.js)",
-        company_name: "TechCorp Global",
-        location: "Remote",
-        via: "LinkedIn",
-        description: "Join our dynamic frontend engineering team building cutting-edge web applications.",
-        apply_options: [{ title: "Apply via LinkedIn", link: "https://linkedin.com" }],
-      },
-      {
-        title: "Full Stack Engineer",
-        company_name: "InnovateLabs",
-        location: "Bengaluru, India",
-        via: "Indeed",
-        description: "Looking for full stack developers proficient in TypeScript, React, and Node.js.",
-        apply_options: [{ title: "Apply via Indeed", link: "https://indeed.com" }],
-      },
-    ]);
+    return NextResponse.json(
+      { error: "Job search is not configured on this server.", code: "SEARCH_PROVIDER_UNCONFIGURED" },
+      { status: 503 }
+    );
   }
 
   try {

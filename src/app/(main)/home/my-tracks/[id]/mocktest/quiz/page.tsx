@@ -172,6 +172,17 @@ export default function QuizPage() {
     return newArray;
   };
 
+  // Generate once per mount; calling this from render would re-fire the three
+  // LLM requests on every re-render.
+  const generationStartedRef = useRef(false);
+
+  useEffect(() => {
+    if (generationStartedRef.current) return;
+    if (questions.length > 0 || isLoading) return;
+    generationStartedRef.current = true;
+    generateQuestions();
+  }, [questions.length, isLoading]);
+
   // Timer effect - start when questions are loaded and enter fullscreen
   useEffect(() => {
     if (questions.length > 0 && !startTime) {
@@ -203,7 +214,12 @@ export default function QuizPage() {
   // Function to start quiz in fullscreen (triggered by user click)
   const handleStartQuizFullscreen = async () => {
     setShowFullscreenPrompt(false);
-    
+
+    // Start the timer before touching the fullscreen API: a denied or pending
+    // fullscreen request must not stop the quiz from starting.
+    requestWakeLock();
+    startQuiz();
+
     try {
       // Enter fullscreen - MUST be called directly from user interaction
       if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
@@ -216,11 +232,6 @@ export default function QuizPage() {
       console.warn('Fullscreen not supported or denied:', err);
       // Continue without fullscreen if it fails
     }
-    
-    // Request wake lock to keep screen on
-    requestWakeLock();
-    // Start quiz timer
-    startQuiz();
   };
 
   // Wake Lock functions to prevent screen from sleeping
@@ -274,40 +285,39 @@ export default function QuizPage() {
 
   // Question timer effect
   useEffect(() => {
-    if (questions.length === 0 || isAutoAdvancing) return;
+    // startTime is only set once the student presses Start Mock Test. Without
+    // this guard the countdown ran behind the instructions screen and silently
+    // auto-advanced questions the student had never seen.
+    if (questions.length === 0 || isAutoAdvancing || !startTime) return;
 
     // Reset timer when question changes
     setQuestionTimer(0);
 
     const timer = setInterval(() => {
-      setQuestionTimer((prev) => {
-        const newTime = prev + 1;
-        const timeLimit = getQuestionTimeLimit();
-
-        // Auto-advance when time is up
-        if (newTime >= timeLimit) {
-          handleAutoAdvance();
-          return 0;
-        }
-
-        return newTime;
-      });
+      setQuestionTimer((prev) => prev + 1);
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [currentQuestionIndex, questions.length, isAutoAdvancing]);
+  }, [currentQuestionIndex, questions.length, isAutoAdvancing, startTime]);
+
+  // Auto-advance once the question's time is up. This must stay out of the
+  // setQuestionTimer updater: firing it from there re-ran the updater and
+  // skipped several questions at once, so students never saw them.
+  useEffect(() => {
+    if (questions.length === 0 || isAutoAdvancing || !startTime) return;
+    if (questionTimer < getQuestionTimeLimit()) return;
+    handleAutoAdvance();
+  }, [questionTimer, currentQuestionIndex, questions.length, isAutoAdvancing, startTime]);
 
   const handleAutoAdvance = () => {
     if (isAutoAdvancing) return;
 
     setIsAutoAdvancing(true);
-    const currentQuestion = questions[currentQuestionIndex];
-    const hasAnswer = answers[currentQuestion?.id];
+    // Reset the countdown here as well: the auto-advance effect reads this
+    // value, and leaving it at the limit would fire a second skip.
+    setQuestionTimer(0);
 
-    // If no answer selected, skip the question (don't save)
-    // If answer selected, it's already saved in the store
-
-    // Move to next question or finish
+    // Move to the next question or finish
     setTimeout(() => {
       if (currentQuestionIndex < questions.length - 1) {
         nextQuestion();
@@ -773,7 +783,7 @@ export default function QuizPage() {
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Error</h2>
           <p className="text-gray-600 mb-6">{error}</p>
           <button
-            onClick={() => router.push('/')}
+            onClick={() => router.back()}
             className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
           >
             Go Back
@@ -784,8 +794,6 @@ export default function QuizPage() {
   }
 
   if (questions.length === 0) {
-    // Always generate fresh questions when component mounts
-    generateQuestions();
     return null;
   }
 

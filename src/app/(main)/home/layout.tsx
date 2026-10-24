@@ -1,6 +1,7 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/app/(main)/_components/app-sidebar";
 import { Toaster } from "@/components/ui/sonner";
@@ -9,6 +10,32 @@ import { QuizDataProvider } from "@/context/userQuizProvider";
 import { usePathname } from "next/navigation";
 import GetUserLocation from "@/app/(main)/_components/GeoLocation";
 import { InterviewProvider } from "@/context/InterviewContext";
+import { createClient } from "@/lib/supabase/client";
+
+function StudentAuthGate({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+  const [allowed, setAllowed] = useState(false);
+
+  useEffect(() => {
+    const check = async () => {
+      const supabase = createClient();
+      const { data } = await supabase.auth.getUser();
+      const role = data?.user?.user_metadata?.role;
+
+      if (!role) {
+        router.replace("/auth");
+      } else if (role !== "user") {
+        router.replace("/unauthorized");
+      } else {
+        setAllowed(true);
+      }
+    };
+    check();
+  }, [router]);
+
+  if (!allowed) return <div className="p-6">Checking access...</div>;
+  return <>{children}</>;
+}
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -33,7 +60,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <QuizDataProvider>
             <InterviewProvider>
               {!hideNavbar && <Navbar />}
-              {children}
+              <StudentAuthGate>{children}</StudentAuthGate>
             </InterviewProvider>
           </QuizDataProvider>
         </main>

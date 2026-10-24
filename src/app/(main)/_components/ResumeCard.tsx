@@ -1,8 +1,11 @@
+"use client";
 import { ArrowRight, Book, LucideArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 
 const ResumeCard = () => {
+  const router = useRouter();
   const card = {
     id: 2,
     title: "ATS friendly Resume Builder",
@@ -34,7 +37,11 @@ const ResumeCard = () => {
             {/* Call-to-action buttons */}
             <div className="flex items-center gap-8">
              
-              <Button className="cursor-pointer" variant="outline">
+              <Button
+                className="cursor-pointer"
+                variant="outline"
+                onClick={() => router.push("/home/ai-tools/resume-maker/start")}
+              >
                 Start Now <LucideArrowRight size={18} />
               </Button>
             </div>

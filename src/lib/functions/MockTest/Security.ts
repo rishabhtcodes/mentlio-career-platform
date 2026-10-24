@@ -1,4 +1,4 @@
-import { ProctorEvent } from '@/app/api/ai/mocktest/security/route';
+import type { ProctorEvent } from '@/lib/types/proctor';
 
 
 export async function logProctorEvent(
@@ -8,7 +8,7 @@ export async function logProctorEvent(
   metadata?: Record<string, any>
 ): Promise<void> {
   try {
-    await fetch('/api/ai/mocktest/security/events', {
+    await fetch('/api/ai/mocktest/security', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

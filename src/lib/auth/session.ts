@@ -2,7 +2,25 @@ import crypto from "crypto";
 import { cookies } from "next/headers";
 
 const SESSION_COOKIE_NAME = "mentlio_session";
-const SESSION_SECRET = process.env.SESSION_SECRET || "mentlio-super-secure-local-session-secret-key-32chars";
+
+// This file is in version control, so its fallback can only ever be a dev
+// convenience. A deployment without SESSION_SECRET would let anyone who reads
+// the repository mint a valid cookie for any account, so production refuses to
+// start instead of silently signing sessions with a public key.
+const DEV_ONLY_FALLBACK_SECRET = "mentlio-super-secure-local-session-secret-key-32chars";
+
+function resolveSessionSecret(): string {
+  const fromEnv = process.env.SESSION_SECRET;
+  if (fromEnv && fromEnv.length >= 32) return fromEnv;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "SESSION_SECRET is missing or shorter than 32 characters. Generate one with: node -e \"console.log(require('crypto').randomBytes(48).toString('hex'))\""
+    );
+  }
+  return DEV_ONLY_FALLBACK_SECRET;
+}
+
+const SESSION_SECRET = resolveSessionSecret();
 
 export interface SessionPayload {
   userId: string;

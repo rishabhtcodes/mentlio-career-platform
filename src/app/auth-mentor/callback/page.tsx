@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 "use client";
-import React, { useEffect } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
@@ -15,6 +15,8 @@ const MentorCallback = () => {
   const supabase = createClient();
   const router = useRouter();
   const { mentor, isNewMentor, loading, ensureUserInDB } = useUserData();
+  const [authChecked, setAuthChecked] = useState(false);
+  const welcomedRef = useRef(false);
 
   async function signOut() {
     try {
@@ -26,25 +28,42 @@ const MentorCallback = () => {
   }
 
   useEffect(() => {
-    ensureUserInDB();
+    let cancelled = false;
+    (async () => {
+      await ensureUserInDB();
+      if (!cancelled) setAuthChecked(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
-    if (!loading && mentor) {
-      const isOnboardingIncomplete =
-        typeof window !== "undefined" &&
-        localStorage.getItem("isOnboardingDoneMentor") === "false";
-
-      if (isNewMentor) {
-        toast(`Welcome aboard, ${mentor?.email}!`);
-      } else if (isOnboardingIncomplete || mentor?.is_verified === false) {
-        toast("Resuming your onboarding Process");
-      } else {
-        toast(`Welcome back, ${mentor?.full_name}!`);
-        router.push("/dashboard");
-      }
+    if (authChecked && !loading && !mentor) {
+      router.push("/auth-mentor");
     }
-  }, [isNewMentor, loading, mentor]);
+  }, [authChecked, loading, mentor, router]);
+
+  useEffect(() => {
+    // Decide only once this session's mentor row has resolved — an earlier pass
+    // on a stale mentor let unverified accounts jump straight to /dashboard.
+    if (!authChecked || loading || !mentor || welcomedRef.current) return;
+    welcomedRef.current = true;
+
+    const needsOnboarding =
+      mentor.is_verified !== true ||
+      (typeof window !== "undefined" &&
+        localStorage.getItem("isOnboardingDoneMentor") === "false");
+
+    if (isNewMentor) {
+      toast(`Welcome aboard, ${mentor?.email}!`);
+    } else if (needsOnboarding) {
+      toast("Resuming your onboarding Process");
+    } else {
+      toast(`Welcome back, ${mentor?.full_name}!`);
+      router.push("/dashboard");
+    }
+  }, [authChecked, isNewMentor, loading, mentor, router]);
 
   if (loading || !mentor) {
     return (
@@ -65,8 +84,11 @@ const MentorCallback = () => {
       ? localStorage.getItem("isOnboardingDoneMentor")
       : null;
 
-  console.log(onboardingStatus);
-  if (onboardingStatus === "false" || isNewMentor) {
+  if (
+    onboardingStatus === "false" ||
+    isNewMentor ||
+    mentor?.is_verified !== true
+  ) {
     return (
       <div className="h-screen w-full relative bg-white ">
         <div className="absolute top-2 left-5 z-50">

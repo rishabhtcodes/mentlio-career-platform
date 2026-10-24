@@ -5,6 +5,8 @@ import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import Image from "next/image";
 import { useUserData } from "@/context/UserDataProvider";
+import { uploadToImageKit } from "@/lib/media/imagekit-upload";
+import { toast } from "sonner";
 
 export default function MentorAvatar() {
   const { mentor } = useUserData();
@@ -13,40 +15,31 @@ export default function MentorAvatar() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(mentor?.avatar || null);
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!mentor?.id) {
+      toast.error("Mentor profile is still loading. Try again in a moment.");
+      return;
+    }
+
+    setUploading(true);
     try {
-      setUploading(true);
-      if (!e.target.files || e.target.files.length === 0) return;
+      const publicUrl = await uploadToImageKit(file, "/avatars");
 
-      const file = e.target.files[0];
-      const fileExt = file.name.split(".").pop();
-      const filePath = `avatars/${mentor?.id}.${fileExt}`;
-
-      // Upload to Supabase storage
-      const { error: uploadError } = await supabase.storage
-        .from("avatars")
-        .upload(filePath, file, { upsert: true });
-
-      if (uploadError) throw uploadError;
-
-      // Get public URL
-      const { data } = supabase.storage.from("avatars").getPublicUrl(filePath);
-      const publicUrl = data.publicUrl;
-
-      // Update local state for instant preview
       setAvatarUrl(publicUrl);
 
-      // Update DBMentor record with avatar url
       const { error: dbError } = await supabase
         .from("mentors")
         .update({ avatar: publicUrl })
-        .eq("id", mentor?.id);
+        .eq("id", mentor.id);
 
       if (dbError) throw dbError;
 
-      alert("Avatar updated successfully!");
+      toast.success("Avatar updated successfully!");
     } catch (err: any) {
-      console.error(err);
-      alert("Error uploading avatar");
+      console.error("Avatar upload error:", err);
+      toast.error(err?.message || "Avatar upload failed.");
+      e.target.value = "";
     } finally {
       setUploading(false);
     }
@@ -61,9 +54,15 @@ export default function MentorAvatar() {
         height={100}
         className="w-32 h-32 rounded-full object-cover"
       />
-      <label className="cursor-pointer px-4 py-2 bg-blue-600 text-white rounded">
+      <label htmlFor="mentor-avatar-upload" className="cursor-pointer px-4 py-2 bg-blue-600 text-white rounded">
         {uploading ? "Uploading..." : "Upload Avatar"}
-        <input type="file" hidden accept="image/*" onChange={handleUpload} />
+        <input
+          id="mentor-avatar-upload"
+          type="file"
+          hidden
+          accept="image/*"
+          onChange={handleUpload}
+        />
       </label>
     </div>
   );

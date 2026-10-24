@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 // NOTE: This file contains async data access functions used by client components.
 // It intentionally uses the browser supabase client.
 
@@ -214,7 +213,10 @@ export async function getUserQuizData(userId: any): Promise<UserQuizData[]> {
     const { data, error } = await supabase
       .from("userQuizData")
       .select("*")
-      .eq("userId", userId);
+      .eq("userId", userId)
+      // Callers read data[0] as "the latest quiz"; without this they could get
+      // an older attempt whose quizInfo has no career options.
+      .order("created_at", { ascending: false });
 
     if (error) {
       console.error("Error fetching quiz data:", error);
@@ -222,6 +224,17 @@ export async function getUserQuizData(userId: any): Promise<UserQuizData[]> {
     }
 
     const quizData = (data || []) as UserQuizData[];
+
+    // A retake inserts a brand-new row, and older/partial rows may not carry the
+    // career choice. Every caller reads rows[0], so backfill the choice from the
+    // newest row that actually has one — otherwise a retake silently makes the
+    // student's career "disappear" from the board, jobs and mentor matching.
+    const latestCareer = quizData.find((row) => !!row.selectedCareer)?.selectedCareer;
+    if (latestCareer) {
+      quizData.forEach((row) => {
+        if (!row.selectedCareer) row.selectedCareer = latestCareer;
+      });
+    }
 
     // if (quizData.length > 0) {
     //   await redis.set(cacheKey, quizData, { ex: 600 });
@@ -425,68 +438,32 @@ export async function getSuggestedCollegeData(
   return filtered.slice(0, 10);
 }
 
-// 1. GET selectedCareer
-export async function getSelectedCareer(userId: any): Promise<string | null> {
-  const supabase = createClient();
-
-  const { data, error } = await supabase
-    .from("userQuizData")
-    .select("selectedCareer")
-    .eq("userId", userId)
-    .single();
-
-  if (error) {
-    console.error("❌ Error fetching selectedCareer:", error);
-    return null;
-  }
-
-  return data?.selectedCareer || null;
-}
-
-// 2. INSERT selectedCareer
-export async function insertSelectedCareer(
+// Persists the career a student picks in the AI career coach. Every personalized
+// surface (career board, jobs, courses, peer lists, roadmap) reads
+// userQuizData.selectedCareer, so this write is what unlocks them.
+export async function setSelectedCareer(
   userId: any,
   selectedCareer: string
-) {
+): Promise<boolean> {
   const supabase = createClient();
-
-  const { data, error } = await supabase
-    .from("userQuizData")
-    .insert([{ userId, selectedCareer }])
-    .select("selectedCareer")
-    .single();
-
-  if (error) {
-    console.error("❌ Error inserting selectedCareer:", error);
-    return null;
-  }
-
-  return data?.selectedCareer || null;
-}
-
-// 3. UPDATE selectedCareer
-export async function updateSelectedCareer(
-  userId: any,
-  selectedCareer: string
-) {
-  const supabase = createClient();
-  console.log("USER ID--------------->", userId)
-  console.log("Selected Carrer--------------->", selectedCareer)
-
 
   const { data, error } = await supabase
     .from("userQuizData")
     .update({ selectedCareer })
-    .eq("userId", userId)
-    .select("selectedCareer")
-    .single();
+    .eq("userId", userId);
 
   if (error) {
-    console.error("❌ Error updating selectedCareer:", error);
-    return null;
+    console.error("❌ Error saving selectedCareer:", error);
+    return false;
   }
 
-  return data?.selectedCareer || null;
+  const updated = (data as any)?.updated;
+  if (updated === 0) {
+    console.error("❌ No quiz record found for this user to attach the career to.");
+    return false;
+  }
+
+  return true;
 }
 
 export async function paginatedColleges(

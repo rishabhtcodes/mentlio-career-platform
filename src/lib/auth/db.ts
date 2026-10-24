@@ -15,6 +15,12 @@ export interface DatabaseSchema {
   mentor_sessions: Array<Record<string, any>>;
   payments: Array<Record<string, any>>;
   orders: Array<Record<string, any>>;
+  // Written by the browser client through /api/data/[table].
+  messages: Array<Record<string, any>>;
+  job_tracker: Array<Record<string, any>>;
+  userCalendar: Array<Record<string, any>>;
+  roadmapUsers: Array<Record<string, any>>;
+  proctor_events: Array<Record<string, any>>;
 }
 
 const DEFAULT_DB: DatabaseSchema = {
@@ -65,6 +71,11 @@ const DEFAULT_DB: DatabaseSchema = {
   mentor_sessions: [],
   payments: [],
   orders: [],
+  messages: [],
+  job_tracker: [],
+  userCalendar: [],
+  roadmapUsers: [],
+  proctor_events: [],
 };
 
 function getStoragePath(): string {
@@ -110,7 +121,16 @@ function ensureDbFile(): DatabaseSchema {
 }
 
 export function readDb(): DatabaseSchema {
-  return ensureDbFile();
+  const db = ensureDbFile();
+  // Migration: files written before a table was added must still expose it.
+  for (const key of Object.keys(DEFAULT_DB) as Array<keyof DatabaseSchema>) {
+    if (!Array.isArray(db[key])) db[key] = [];
+  }
+  return db;
+}
+
+export function isKnownTable(tableName: string): boolean {
+  return Object.prototype.hasOwnProperty.call(readDb(), tableName);
 }
 
 export function writeDb(data: DatabaseSchema): void {

@@ -62,7 +62,7 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
   const supabase = createClient();
   const [user, setUser] = useState<DBUser | null>(null);
   const [mentor, setMentor] = useState<DBMentor | null>(null);
-  const [loading, setLoading] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(true);
   const [isNewUser, setIsNewUser] = useState<boolean>(false);
   const [isNewMentor, setIsNewMentor] = useState<boolean>(false);
 
@@ -79,6 +79,8 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
 
       if (authError) {
         console.log("❌ Error fetching auth user:", authError.message);
+        setUser(null);
+        setMentor(null);
         setLoading(false);
         return;
       }
@@ -86,11 +88,19 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
       const authUser = authData?.user;
       if (!authUser) {
         console.log("⚠️ No authenticated user");
+        setUser(null);
+        setMentor(null);
+        setIsNewUser(false);
+        setIsNewMentor(false);
         setLoading(false);
         return;
       }
 
-      console.log("✅ Authenticated user:", authUser.email);
+      // A different account signed in inside the same tab: drop the previous
+      // identity before the new row resolves, otherwise pages (and the
+      // onboarding gate) act on someone else's cached profile.
+      setUser((prev) => (prev && prev.userEmail !== authUser.email ? null : prev));
+      setMentor((prev) => (prev && prev.email !== authUser.email ? null : prev));
 
       // checking id user signed with email
       const provider = authUser.app_metadata?.provider;
@@ -103,7 +113,6 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
       }
 
       const role = authUser.user_metadata?.role;
-      console.log("⚠️ User role:", role);
 
       if (role === "mentor") {
         // --- Mentors ---

@@ -148,7 +148,7 @@ const ConfirmTab = () => {
                 </div>
               </div>
               <p className="text-sm font-inter">
-                {session.scheduled_at
+                {session.requested_at
                   ? new Date(session.requested_at).toLocaleDateString()
                   : "Date of requested"}
               </p>

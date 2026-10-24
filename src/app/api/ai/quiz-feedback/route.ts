@@ -1,10 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // api/ai/quiz-feedback/route.ts
 import { NextResponse } from "next/server";
-import { ChatGroq } from "@langchain/groq";
 import { PromptTemplate } from "@langchain/core/prompts";
 import { StructuredOutputParser } from "@langchain/core/output_parsers";
 import { z } from "zod";
+import { getServerSession } from "@/lib/auth/session";
+import { groqComplete, llmErrorResponse } from "@/lib/ai/groq";
 
 interface QuizRequest {
   quizData: { section: string; question: string; answer: string }[];
@@ -86,22 +87,19 @@ function getSchemaAndPrompt(userStatus: string, mainFocus: string) {
 
 export async function POST(request: Request) {
   try {
+    const session = await getServerSession();
+    if (!session) {
+      return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+    }
     const apiKey = process.env.GROQ_API_KEY;
     if (!apiKey) {
       return NextResponse.json(
-        { isError: true, error: "GROQ_API_KEY is not configured" },
-        { status: 500 }
+        { isError: true, error: "The language model is not configured on this server.", code: "LLM_UNCONFIGURED" },
+        { status: 503 }
       );
     }
 
     const modelName = process.env.GROQ_MODEL || "openai/gpt-oss-120b";
-
-    const llm = new ChatGroq({
-      apiKey,
-      model: modelName,
-      temperature: 0.3,
-      maxTokens: 1200,
-    });
 
     const body: QuizRequest = await request.json();
     const { quizData, userStatus, mainFocus } = body;
@@ -116,26 +114,30 @@ export async function POST(request: Request) {
     //  Pick schema + prompt dynamically ---
     const { schema, prompt } = getSchemaAndPrompt(userStatus, mainFocus);
     const parser = StructuredOutputParser.fromZodSchema(schema as any);
-    const chain = prompt.pipe(llm).pipe(parser);
 
     //  Convert quiz data into plain string ---
     const quizString = quizData
       .map((q) => `${q.question}: ${q.answer}`)
       .join("\n");
 
-    const input = {
+    const promptText = await prompt.format({
       quizData: quizString,
       format_instructions: parser.getFormatInstructions(),
-    };
+    });
+
+    const rawText = await groqComplete({
+      prompt: promptText,
+      model: modelName,
+      temperature: 0.3,
+      maxTokens: 1200,
+    });
 
     let result: any;
     try {
-      result = (await chain.invoke(input)) as z.infer<typeof schema>;
+      result = (await parser.parse(rawText)) as z.infer<typeof schema>;
     } catch (parseErr) {
-      console.warn("Chain parsing failed, attempting fallback JSON parse...", parseErr);
-      const rawRes = await prompt.pipe(llm).invoke(input);
-      const text = typeof rawRes.content === "string" ? rawRes.content : JSON.stringify(rawRes.content);
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      console.warn("Strict parsing failed, attempting fallback JSON parse...", parseErr);
+      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         result = JSON.parse(jsonMatch[0]);
       } else {
@@ -154,11 +156,7 @@ export async function POST(request: Request) {
     };
 
     return NextResponse.json({ data: finalResult });
-  } catch (error: any) {
-    console.error("❌ CAREER INSIGHT ERROR:", error);
-    return NextResponse.json(
-      { isError: true, error: error.message || "Failed to generate insights" },
-      { status: 500 }
-    );
+  } catch (error) {
+    return llmErrorResponse(error);
   }
 }

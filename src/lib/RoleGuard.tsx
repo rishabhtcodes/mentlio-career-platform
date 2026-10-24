@@ -21,8 +21,6 @@ export default function RoleGuard({
       const { data: authData, error } = await supabase.auth.getUser();
       const role = authData?.user?.user_metadata?.role;
 
-      console.log("🔐 RoleGuard: user role =", role);
-
       if (!role || !allowedRoles.includes(role)) {
         router.replace("/unauthorized");
       } else {

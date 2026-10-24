@@ -5,6 +5,10 @@ import { useRouter, useParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Trophy, Clock, CheckCircle, XCircle, RotateCcw } from 'lucide-react';
 import { useQuizStore } from '@/lib/functions/MockTest/QuizStore';
+import { createClient } from '@/lib/supabase/client';
+import { toast } from 'sonner';
+
+const PASS_PERCENTAGE = 60;
 
 export default function ResultsPage() {
   const router = useRouter();
@@ -12,13 +16,15 @@ export default function ResultsPage() {
   const { questions, answers, startTime, careerPath, reset } = useQuizStore();
   const [score, setScore] = useState(0);
   const [elapsedTime, setElapsedTime] = useState(0);
+  const [checkpointPassed, setCheckpointPassed] = useState(false);
+  const supabase = createClient();
   
   // Quiz type description
   const quizType = questions.length > 0 ? 'Mixed Assessment' : '';
 
   useEffect(() => {
     if (questions.length === 0) {
-      router.push(`/home/my-tracks/${params.id}/start`);
+      router.replace(`/home/my-tracks/${params.id}/start`);
       return;
     }
 
@@ -32,7 +38,8 @@ export default function ResultsPage() {
     };
 
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      reset();
+      // Do NOT reset the store here: Chrome fires this handler even when the
+      // user chooses to stay, which used to wipe the results and leave a blank page.
       e.preventDefault();
       e.returnValue = '';
     };
@@ -48,17 +55,83 @@ export default function ResultsPage() {
     });
     setScore(correct);
 
-    const startedAt = startTime;
-    if (startedAt !== null) {
-      const elapsed = Math.floor((Date.now() - startedAt) / 1000);
+    const percent = questions.length > 0 ? (correct / questions.length) * 100 : 0;
+    setCheckpointPassed(percent >= PASS_PERCENTAGE);
+
+    if (startTime !== null) {
+      const elapsed = Math.floor((Date.now() - startTime) / 1000);
       setElapsedTime(elapsed);
     }
+
+    recordCheckpointResult(percent).catch((err) =>
+      console.error('Failed to record mock test result', err)
+    );
 
     return () => {
       window.removeEventListener('popstate', handlePopState);
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
   }, []);
+
+  // Unlock the next checkpoint only when the mock test is passed.
+  async function recordCheckpointResult(percent: number) {
+    const order = Number(careerPath.match(/^Checkpoint\s+(\d+)/)?.[1]);
+    if (!order) return;
+
+    const { data: trackRow, error: fetchError } = await supabase
+      .from('tracks')
+      .select('checkpoints')
+      .eq('roadmap_id', params.id)
+      .single();
+
+    if (fetchError || !trackRow) {
+      console.error('Track lookup failed', fetchError);
+      toast.error('Your score was saved but the checkpoint could not be updated.');
+      return;
+    }
+
+    const checkpoints = Array.isArray(trackRow.checkpoints)
+      ? trackRow.checkpoints
+      : [];
+    const target = checkpoints[order - 1];
+    if (!target) return;
+
+    const passed = percent >= PASS_PERCENTAGE;
+    if (!passed && target.isMockDone) return;
+
+    const updated = checkpoints.map((cp: any, idx: number) =>
+      idx === order - 1 ? { ...cp, isMockDone: passed } : cp
+    );
+
+    const { error: updateError } = await supabase
+      .from('tracks')
+      .update({ checkpoints: updated })
+      .eq('roadmap_id', params.id);
+
+    if (updateError) {
+      console.error('Checkpoint update failed', updateError);
+      toast.error('Your score was saved but the checkpoint could not be updated.');
+      return;
+    }
+
+    const completed = updated.filter((cp: any) => cp.isMockDone).length;
+    const progress = updated.length
+      ? Math.round((completed / updated.length) * 100)
+      : 0;
+
+    await supabase
+      .from('roadmapUsers')
+      .update({ progress })
+      .eq('id', params.id);
+
+    if (passed) {
+      toast.success(`Checkpoint ${order} passed — progress is now ${progress}%.`);
+    } else {
+      toast.info(
+        `Score ${PASS_PERCENTAGE}% or higher to unlock the next checkpoint.`
+      );
+    }
+  };
 
   const handleRetake = () => {
     reset();
@@ -73,7 +146,24 @@ export default function ResultsPage() {
   };
 
   if (questions.length === 0) {
-    return null;
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-green-50 via-white to-blue-50 p-6">
+        <div className="max-w-md rounded-2xl bg-white p-6 text-center shadow-xl">
+          <h1 className="mb-2 text-lg font-bold text-gray-900">No completed test to show</h1>
+          <p className="mb-4 text-sm text-gray-600">
+            Your results live in memory for this browser session, so refreshing this page or opening
+            it directly clears them. Start a new mock test to see your score.
+          </p>
+          <button
+            type="button"
+            onClick={() => router.replace(`/home/my-tracks/${params.id}/start`)}
+            className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+          >
+            Back to my track
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -226,7 +316,9 @@ export default function ResultsPage() {
               <p className="text-gray-600 text-[10px] sm:text-xs md:text-sm mb-1">Time</p>
               <div className="flex items-center justify-center gap-1 sm:gap-2">
                 <Clock className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-green-600" />
-                <p className="text-lg sm:text-xl md:text-2xl font-bold text-green-600">{formatTime(elapsedTime)}</p>
+                <p className="text-lg sm:text-xl md:text-2xl font-bold text-green-600">
+                  {startTime === null ? '—' : formatTime(elapsedTime)}
+                </p>
               </div>
             </div>
 
@@ -237,6 +329,19 @@ export default function ResultsPage() {
                 {percentage >= 80 ? 'Excellent' : percentage >= 60 ? 'Good' : percentage >= 40 ? 'Fair' : 'Poor'}
               </p>
             </div>
+          </div>
+
+          {/* Checkpoint outcome — mirrors the rule enforced in recordCheckpointResult */}
+          <div
+            className={`mb-2 sm:mb-3 flex-shrink-0 rounded-lg border-2 px-3 py-2 text-xs sm:text-sm font-semibold ${
+              checkpointPassed
+                ? 'border-green-200 bg-green-50 text-green-700'
+                : 'border-amber-200 bg-amber-50 text-amber-700'
+            }`}
+          >
+            {checkpointPassed
+              ? `Checkpoint passed (${PASS_PERCENTAGE}% rule met) — the next checkpoint is unlocked.`
+              : `Not passed yet — score ${PASS_PERCENTAGE}% or higher to unlock the next checkpoint.`}
           </div>
 
           {/* Question Review - Scrollable */}

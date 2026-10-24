@@ -2,20 +2,38 @@ import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 import { retrivalServer } from "@/lib/functions/pineconeQuery";
 import { tavily } from "@tavily/core";
+import { getServerSession } from "@/lib/auth/session";
+import { groqComplete, groqModel } from "@/lib/ai/groq";
+
+// Must be a model this account can actually reach — `llama-3.3-70b-versatile`
+// returns 404 model_not_found here.
+const GROQ_FALLBACK_MODEL = "openai/gpt-oss-120b";
+
+async function askGroq(systemPrompt: string, question: string): Promise<string> {
+  if (!process.env.GROQ_API_KEY) return "";
+  try {
+    return await groqComplete({
+      prompt: question,
+      system: systemPrompt,
+      model: groqModel(GROQ_FALLBACK_MODEL),
+      temperature: 0.6,
+      maxTokens: 1200,
+    });
+  } catch (err) {
+    console.warn("Groq fallback failed:", (err as Error).message);
+    return "";
+  }
+}
 
 export async function POST(req: NextRequest) {
   try {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey || apiKey.includes("dummy") || apiKey.startsWith("AIzaSyBw-xO7zJgJzKkSj4jE6s8r6nC2tZ8w8")) {
-      return NextResponse.json(
-        {
-          error:
-            "Gemini API key is not configured or the current key has been revoked/is invalid. Please configure a valid GEMINI_API_KEY in environment variables.",
-          code: "GEMINI_KEY_INVALID",
-        },
-        { status: 503 }
-      );
+    const session = await getServerSession();
+    if (!session) {
+      return NextResponse.json({ error: "Authentication required." }, { status: 401 });
     }
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    const geminiUsable = !!apiKey && !apiKey.includes("dummy") && apiKey.length >= 20;
 
     const body = await req.json();
     const {
@@ -33,8 +51,6 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-
-    const ai = new GoogleGenAI({ apiKey });
 
     // Optional Pinecone context
     let contextDocs = "";
@@ -70,35 +86,51 @@ ${webGrounding ? `\nReal-time Web Search Grounding:\n${webGrounding}` : ""}
 
 Provide concise, actionable, and structured guidance. Use bullet points and clear steps.`;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: [
-        {
-          role: "user",
-          parts: [{ text: question }],
-        },
-      ],
-      config: {
-        systemInstruction: systemPrompt,
-        maxOutputTokens: 600,
+    if (geminiUsable) {
+      try {
+        const ai = new GoogleGenAI({ apiKey: apiKey! });
+        const response = await ai.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: [
+            {
+              role: "user",
+              parts: [{ text: question }],
+            },
+          ],
+          config: {
+            systemInstruction: systemPrompt,
+            maxOutputTokens: 600,
+          },
+        });
+
+        if (response.text) {
+          return NextResponse.json({ reply: response.text, provider: "gemini" });
+        }
+        console.warn("Gemini returned an empty response; trying Groq fallback");
+      } catch (geminiErr: any) {
+        console.warn("Gemini career coach failed, falling back to Groq:", geminiErr?.message);
+      }
+    }
+
+    try {
+      const groqReply = await askGroq(systemPrompt, question);
+      if (groqReply) {
+        return NextResponse.json({ reply: groqReply, provider: "groq" });
+      }
+    } catch (groqErr: any) {
+      console.error("Groq career coach fallback failed:", groqErr?.message || groqErr);
+    }
+
+    return NextResponse.json(
+      {
+        error:
+          "No usable AI provider is configured for the career coach. Set a valid GEMINI_API_KEY or GROQ_API_KEY.",
+        code: "AI_PROVIDER_UNAVAILABLE",
       },
-    });
-
-    const reply = response.text || "I am here to guide your career path. Could you please specify your career goals or key interests?";
-
-    return NextResponse.json({ reply });
+      { status: 503 }
+    );
   } catch (err: any) {
     console.error("Career Coach API error:", err);
-    if (err.status === 400 || err.message?.includes("API key not valid")) {
-      return NextResponse.json(
-        {
-          error:
-            "Gemini API key is invalid or unauthorized. Please verify the API key in Google AI Studio and configure GEMINI_API_KEY.",
-          code: "GEMINI_KEY_INVALID",
-        },
-        { status: 503 }
-      );
-    }
     return NextResponse.json(
       { error: err.message || "Career coach encountered an unexpected issue." },
       { status: 500 }

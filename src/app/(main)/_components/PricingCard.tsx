@@ -75,7 +75,7 @@ export function PricingCard({
             )}
             variant="outline"
           >
-            2K+ Worth Joining Bonus
+            10 Free Credits Included
           </Button>
         ) : (
           <Button

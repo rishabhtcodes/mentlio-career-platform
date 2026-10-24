@@ -1,37 +1,28 @@
-import { ChatGroq } from '@langchain/groq';
 import { PromptTemplate } from '@langchain/core/prompts';
 import { Question, DifficultyLevel } from './QuizStore';
 import { searchForCareerContent, getDifficultyFocus, generateUniqueSeed } from './SearchPipeline';
+import { groqComplete } from '@/lib/ai/groq';
 
 const MAX_RETRIES = 2;
 const RETRY_DELAY = 500;
-const REQUEST_TIMEOUT = 15000; 
+// A 20-question JSON answer needs more than a few seconds; keep it bounded so a
+// stalled upstream cannot hang the request indefinitely.
+const REQUEST_TIMEOUT = 30000;
 
 class QuestionGenerationPipeline {
-  private llm: ChatGroq;
+  private modelName: string;
   private promptTemplate: PromptTemplate;
 
   constructor() {
-    // Initialize Groq LLM with error handling
-    try {
-      const apiKey = process.env.GROQ_API_KEY;
-      
-      if (!apiKey) {
-        throw new Error('GROQ_API_KEY environment variable is not set');
-      }
-      
-      const modelName = process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
-      
-      this.llm = new ChatGroq({
-        apiKey: apiKey,
-        model: modelName,
-        temperature: 0.7,
-        maxTokens: 2000, // Optimized for speed
-      });
-    } catch (error) {
-      console.error('Failed to initialize Groq LLM:', error);
-      throw new Error('LLM initialization failed');
+    const apiKey = process.env.GROQ_API_KEY;
+
+    if (!apiKey) {
+      throw new Error('GROQ_API_KEY environment variable is not set');
     }
+
+    // 'llama-3.1-8b-instant' is not available on this account (404 model_not_found);
+    // keep the same default the AI routes use so behaviour is consistent.
+    this.modelName = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
 
     // Create prompt template for question generation
     this.promptTemplate = PromptTemplate.fromTemplate(`
@@ -176,33 +167,24 @@ Career: {careerPath}
           sessionId: uniqueSessionId,
         });
 
-        // Call LLM with timeout
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
+        const content = await groqComplete({
+          prompt,
+          model: this.modelName,
+          temperature: 0.7,
+          maxTokens: 2000,
+          timeoutMs: REQUEST_TIMEOUT,
+          maxAttempts: 1,
+        });
 
-        try {
-          const response = await this.llm.invoke(prompt, {
-            signal: controller.signal,
-          });
-          clearTimeout(timeoutId);
+        // Parse and validate questions
+        const questions = this.parseQuestions(content);
 
-          const content = typeof response.content === 'string' 
-            ? response.content 
-            : JSON.stringify(response.content);
-
-          // Parse and validate questions
-          const questions = this.parseQuestions(content);
-
-          if (questions.length < Math.min(count, 10)) {
-            console.warn(`Expected ${count} questions, got ${questions.length}. Accepting partial result.`);
-          }
-
-          console.log(`Successfully generated ${questions.length} questions with web-informed content`);
-          return questions;
-        } catch (error) {
-          clearTimeout(timeoutId);
-          throw error;
+        if (questions.length < Math.min(count, 10)) {
+          console.warn(`Expected ${count} questions, got ${questions.length}. Accepting partial result.`);
         }
+
+        console.log(`Successfully generated ${questions.length} questions with web-informed content`);
+        return questions;
       } catch (error) {
         lastError = error instanceof Error ? error : new Error('Unknown error');
         console.error(`Attempt ${attempt} failed:`, lastError.message);

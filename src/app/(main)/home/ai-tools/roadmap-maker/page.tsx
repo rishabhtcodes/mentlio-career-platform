@@ -37,9 +37,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { time } from "console";
 import { useRouter } from "next/navigation";
-import { se } from "date-fns/locale";
 
 const steps = [
   "Getting tools ready...",
@@ -152,6 +150,9 @@ const RoadmapMaker = () => {
             roadmap_data: roadmapJson,
             mode: mode,
             timeline: timeline,
+            isStarted: false,
+            status: "not_started",
+            progress: 0,
           },
         ])
         .select();
@@ -199,7 +200,7 @@ const RoadmapMaker = () => {
 
     const { error } = await supabase
       .from("roadmapUsers")
-      .update({ isStarted: true })
+      .update({ isStarted: true, status: "not_started" })
       .eq("id", roadmapId);
 
     if (error) {
@@ -211,7 +212,19 @@ const RoadmapMaker = () => {
         style: { borderRadius: "8px", background: "#000", color: "#fff" },
         action: {
           label: "Undo",
-          onClick: () => console.log("Undo"),
+          onClick: async () => {
+            const { error: undoError } = await supabase
+              .from("roadmapUsers")
+              .update({ isStarted: false })
+              .eq("id", roadmapId);
+
+            if (undoError) {
+              toast.error("Could not undo. The roadmap is still started.");
+              return;
+            }
+            setIsstarted(false);
+            toast.success("Roadmap start undone.");
+          },
         },
       });
     }

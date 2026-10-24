@@ -1,10 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { NextResponse } from "next/server";
-import { ChatGroq } from "@langchain/groq";
 import { PromptTemplate } from "@langchain/core/prompts";
 import { StructuredOutputParser } from "@langchain/core/output_parsers";
 import { z } from "zod";
+import { getServerSession } from "@/lib/auth/session";
+import { groqComplete, llmErrorResponse } from "@/lib/ai/groq";
 
 interface InterviewRequest {
   jobTitle: string;
@@ -44,25 +45,20 @@ Your task:
 
 export async function POST(request: Request) {
   try {
+    const session = await getServerSession();
+    if (!session) {
+      return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+    }
+
     const apiKey = process.env.GROQ_API_KEY;
     if (!apiKey) {
       return NextResponse.json(
-        { error: "GROQ_API_KEY is not configured" },
-        { status: 500 }
+        { isError: true, error: "The language model is not configured on this server.", code: "LLM_UNCONFIGURED" },
+        { status: 503 }
       );
     }
 
     const modelName = process.env.GROQ_MODEL || "openai/gpt-oss-120b";
-
-    const llm = new ChatGroq({
-      apiKey,
-      model: modelName,
-      temperature: 0.6,
-      maxTokens: 2500,
-      maxRetries: 3,
-    });
-
-    const chain = promptTemplate.pipe(llm).pipe(parser);
 
     const body: InterviewRequest = await request.json();
     const { jobTitle, jobDescription } = body;
@@ -74,20 +70,25 @@ export async function POST(request: Request) {
       );
     }
 
-    const input = {
+    const promptText = await promptTemplate.format({
       jobTitle,
       jobDescription,
       format_instructions: parser.getFormatInstructions(),
-    };
+    });
+
+    const rawText = await groqComplete({
+      prompt: promptText,
+      model: modelName,
+      temperature: 0.6,
+      maxTokens: 2500,
+    });
 
     let result: any;
     try {
-      result = await chain.invoke(input);
+      result = await parser.parse(rawText);
     } catch (parseErr) {
-      console.warn("Chain parsing failed in qna-generate, trying fallback extraction...", parseErr);
-      const rawRes = await promptTemplate.pipe(llm).invoke(input);
-      const text = typeof rawRes.content === "string" ? rawRes.content : JSON.stringify(rawRes.content);
-      const jsonMatch = text.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
+      console.warn("Strict parsing failed in qna-generate, trying fallback extraction...", parseErr);
+      const jsonMatch = rawText.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
       if (jsonMatch) {
         result = JSON.parse(jsonMatch[0]);
       } else {
@@ -109,11 +110,7 @@ export async function POST(request: Request) {
     };
 
     return NextResponse.json({ data: finalResult });
-  } catch (error: any) {
-    console.error("❌ ERROR in qna-generate:", error);
-    return NextResponse.json(
-      { isError: true, error: error.message || "Failed to generate questions" },
-      { status: 500 }
-    );
+  } catch (error) {
+    return llmErrorResponse(error);
   }
 }

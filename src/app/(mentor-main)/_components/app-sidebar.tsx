@@ -131,12 +131,12 @@ export function AppSidebar() {
          <SidebarMenuItem
           className={`flex cursor-pointer duration-200 ease-in-out rounded py-1 px-3
       ${
-        pathname === "/dashboard/history"
+        pathname === "/dashboard/sessions"
           ? "bg-blue-400 scale-105 hover:bg-white/10"
           : "hover:bg-white/10 hover:scale-105"
       }`}
         >
-          <Link href="/dashboard/upload" className="w-full">
+          <Link href="/dashboard/sessions" className="w-full">
             <p className="flex items-center gap-3 font-medium font-inter text-base text-white tracking-wide">
               <LuHistory className="text-xl" />
               All Sessions
@@ -246,49 +246,13 @@ export function AppSidebar() {
 
               {/* Actions */}
               <div className="flex flex-col gap-1">
-                <Button
-                  variant="ghost"
-                  className="justify-start gap-2 w-full font-roboto hover:bg-gray-50 rounded-none cursor-pointer"
+                <Link
+                  href="/dashboard/profile"
+                  className="flex items-center gap-2 w-full px-3 py-2 rounded-none font-roboto text-sm hover:bg-gray-50 text-black"
                 >
-                  <LuArrowUpRight className="text-[18px]" />
-                  Upgrade to Pro
-                </Button>
-
-                <Separator />
-
-                <Button
-                  variant="ghost"
-                  className="justify-between w-full font-roboto hover:bg-gray-50 rounded-none cursor-pointer"
-                >
-                  <div className="flex gap-2 items-center">
-                    <LuSettings className="text-[18px]" />
-                    Profile
-                  </div>
-                  <kbd className="text-xs text-muted-foreground bg-muted px-1 py-0.5 rounded">
-                    Ctrl+Alt+P
-                  </kbd>
-                </Button>
-
-                <Button
-                  variant="ghost"
-                  className="justify-start gap-2 w-full font-roboto hover:bg-gray-50 rounded-none cursor-pointer"
-                >
-                  <LuCreditCard className="text-[18px]" />
-                  Billing
-                </Button>
-
-                <Button
-                  variant="ghost"
-                  className="justify-between w-full font-roboto hover:bg-gray-50 rounded-none cursor-pointer"
-                >
-                  <div className="flex gap-2 items-center">
-                    <Stars className="text-[18px]" />
-                    Ai Assistant
-                  </div>
-                  <kbd className="text-xs text-muted-foreground bg-muted px-1 py-0.5 rounded">
-                    Ctrl+Alt+D
-                  </kbd>
-                </Button>
+                  <LuSettings className="text-[18px]" />
+                  Profile
+                </Link>
 
                 <Separator />
 

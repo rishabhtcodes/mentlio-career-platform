@@ -7,11 +7,12 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import EditorStepper from "@/app/(main)/home/ai-tools/resume-maker/_components/EditorSidebar/EditorSidebar";
 import { ResumePreview } from "@/app/(main)/home/ai-tools/resume-maker/_components/Preview/ResumePreviewOne";
 import { LucideMenuSquare } from "lucide-react";
 import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
-import { LuBrain, LuChevronLeft, LuGrip } from "react-icons/lu";
+import { LuChevronLeft, LuGrip } from "react-icons/lu";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { useResumeStore } from "@/lib/store/useResumeStore";
@@ -19,6 +20,7 @@ import { LuArrowUp, LuArrowDown } from "react-icons/lu";
 
 export default function ResumeStart() {
   const [styleSidebarOpen, setStyleSidebarOpen] = useState(false);
+  const router = useRouter();
   const { open: sidebarOpen, isMobile } = useSidebar();
   const setThemeColor = useResumeStore((state) => state.setThemeColor);
   const sections = useResumeStore((s) => s.resume.sections);
@@ -29,14 +31,14 @@ export default function ResumeStart() {
       <div className="flex items-center justify-between w-full px-7">
         <div className="flex items-center gap-6">
           <SidebarTrigger />
-          <h2>
+          <button
+            type="button"
+            onClick={() => router.push("/home/ai-tools/resume-maker")}
+            className="font-inter text-sm tracking-tight cursor-pointer hover:opacity-70"
+          >
             <LuChevronLeft className="w-5 h-5 inline-block ml-2" /> Back
-          </h2>
+          </button>
         </div>
-
-        <Button className="font-inter text-sm tracking-tight bg-gradient-to-br from-purple-300 to-blue-500">
-          Generate with AI <LuBrain className="w-5 h-5 inline-block ml-2" />
-        </Button>
       </div>
 
       <div

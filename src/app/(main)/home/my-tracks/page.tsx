@@ -128,7 +128,7 @@ const MyTracks = () => {
       });
 
       // CREATING AND SAVING CHECKPOINTS---
-      if (track.status === "not_started") {
+      if (!track.status || track.status === "not_started") {
         const { firstCheckpoint } = await getOrCreateRoadmapTrack({
           id: track.id,
           user_id: track.user_id,
@@ -163,7 +163,7 @@ const MyTracks = () => {
           if (trackErr || !trackRow) throw trackErr;
 
           // Clone current checkpoints
-          const updatedCheckpoints = [...trackRow.checkpoints];
+          const updatedCheckpoints = [...(trackRow.checkpoints || [])];
 
           // Update only FIRST checkpoint
           updatedCheckpoints[0] = {
@@ -217,11 +217,21 @@ const MyTracks = () => {
   // ==========UPDATE STATUS TO pause=============
 
   const updatePause = async (track: myRoadmap) => {
-    await supabase
+    const { error } = await supabase
       .from("roadmapUsers")
       .update({ status: "paused" })
       .eq("id", track.id);
+
+    if (error) {
+      console.error("Failed to pause track", error);
+      toast.error("Failed to pause this track. Please try again.");
+      return;
+    }
+
     setStartedTracks((prev) =>
+      prev.map((t) => (t.id === track.id ? { ...t, status: "paused" } : t))
+    );
+    setActiveTracks((prev) =>
       prev.map((t) => (t.id === track.id ? { ...t, status: "paused" } : t))
     );
     toast.success("Track paused successfully!");
@@ -231,11 +241,21 @@ const MyTracks = () => {
   // ==============continue the PAUSED TRACK==================
 
   const updateContinue = async (track: myRoadmap) => {
-    await supabase
+    const { error } = await supabase
       .from("roadmapUsers")
       .update({ status: "going_on" })
       .eq("id", track.id);
+
+    if (error) {
+      console.error("Failed to resume track", error);
+      toast.error("Failed to resume this track. Please try again.");
+      return;
+    }
+
     setStartedTracks((prev) =>
+      prev.map((t) => (t.id === track.id ? { ...t, status: "going_on" } : t))
+    );
+    setActiveTracks((prev) =>
       prev.map((t) => (t.id === track.id ? { ...t, status: "going_on" } : t))
     );
     toast.success("Track successfully continued!");
@@ -335,7 +355,9 @@ const MyTracks = () => {
 
                       <div className="mt-2 flex gap-2">
                         <Button
-                          onClick={() => router.push(`/home/my-tracks`)}
+                          onClick={() =>
+                            router.push(`/home/my-tracks/${t.id}/start`)
+                          }
                           size="sm"
                           className="w-full font-inter text-sm bg-gradient-to-br from-indigo-400 to-sky-500 text-white"
                         >
@@ -392,17 +414,32 @@ const MyTracks = () => {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-4">
             {startedTracks.map((track) => {
-              const randomImage = `/${Math.floor(Math.random() * 5) + 1}.png`;
+              const nodes = Array.isArray(track.roadmap_data?.initialNodes)
+                ? track.roadmap_data.initialNodes
+                : [];
+              const progress = track.progress || 0;
+              const stageIndex = nodes.length
+                ? Math.min(
+                    Math.round((progress / 100) * nodes.length),
+                    nodes.length - 1
+                  )
+                : 0;
+              const stageTitle =
+                nodes[stageIndex]?.data?.title ||
+                track.timeline ||
+                "Not scheduled";
+              const coverImage = `/${(Math.abs(Number(track.id)) % 5) + 1}.png`;
+              const status = track.status || "not_started";
 
               return (
                 <div
                   key={track.id}
-                  className="bg-white rounded-xl shadow-md p-4 border hover:shadow-lg transition cursor-pointer w-[320px] h-[330px]"
+                  className="bg-white rounded-xl shadow-md p-4 border hover:shadow-lg transition w-[320px] h-[330px]"
                 >
                   {/* Thumbnail Image */}
                   <div className="h-36 w-full rounded-lg overflow-hidden mb-3">
                     <Image
-                      src={randomImage}
+                      src={coverImage}
                       alt="Roadmap"
                       width={400}
                       height={200}
@@ -419,9 +456,9 @@ const MyTracks = () => {
                   <p className="text-sm text-gray-500 font-inter mt-2">
                     <span className="font-semibold text-black">
                       <LuSignpost className="inline mr-1 -mt-1 text-[16px]" />{" "}
-                      Checkpoint-1
+                      Checkpoint-{stageIndex + 1}
                     </span>{" "}
-                    : Python Basics
+                    : {stageTitle}
                   </p>
 
                   {/* Progress Bar */}
@@ -438,7 +475,7 @@ const MyTracks = () => {
 
                   <div className="flex w-full items-center mt-4 justify-between">
                     <div>
-                      {track.status === "not_started" ? (
+                      {status === "not_started" ? (
                         <Button
                           onClick={() => handleStartLearning(track)}
                           className="font-inter text-sm w-full cursor-pointer bg-gradient-to-br from-indigo-400 to-sky-500 text-white"
@@ -446,7 +483,7 @@ const MyTracks = () => {
                         >
                           Start Learning <LuChevronRight size={16} />
                         </Button>
-                      ) : track.status === "going_on" ? (
+                      ) : status === "going_on" ? (
                         <Button
                           className="font-inter text-sm w-full cursor-pointer bg-gradient-to-br from-indigo-400 to-sky-500 text-white"
                           size="sm"
@@ -456,10 +493,11 @@ const MyTracks = () => {
                         >
                           Continue Learning <LuChevronRight size={16} />
                         </Button>
-                      ) : track.status === "completed" ? (
+                      ) : status === "completed" ? (
                         <Button
-                          className="font-inter text-sm w-full cursor-pointer bg-gradient-to-br from-green-400 to-green-600 text-white"
+                          className="font-inter text-sm w-full cursor-default bg-gradient-to-br from-green-400 to-green-600 text-white"
                           size="sm"
+                          disabled
                         >
                           Completed <LuAward size={16} />
                         </Button>
@@ -477,9 +515,16 @@ const MyTracks = () => {
                     {/* === TO EDIT THE TRACK (pause or delete) === */}
                     <Popover>
                       <PopoverTrigger asChild>
-                        <div className="w-9 h-9 bg-gray-100 text-black border rounded-md flex items-center justify-center cursor-pointer hover:bg-gray-200 transition">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          aria-label={`Track options for ${
+                            track.roadmap_data?.roadmapTitle || "this track"
+                          }`}
+                          className="h-9 w-9 bg-gray-100 text-black border p-0 hover:bg-gray-200 focus-visible:ring-2"
+                        >
                           <IoSettingsOutline size={18} />
-                        </div>
+                        </Button>
                       </PopoverTrigger>
 
                       <PopoverContent className="w-40 p-2 font-inter text-sm">

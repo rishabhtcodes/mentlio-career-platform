@@ -2,10 +2,12 @@
 import { ArrowRight, Book, LucideArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { useUserData } from "@/context/UserDataProvider";
 
 const SingleCard = () => {
   const {mentor} = useUserData();
+  const router = useRouter();
   const card = {
     id: 2,
     title: "Welcome ",
@@ -38,6 +40,7 @@ const SingleCard = () => {
             <div className="flex items-center gap-8">
               <Button
                 className={`bg-gradient-to-r ${card.buttonGradient} text-white rounded-lg font-medium transition-all duration-200 group cursor-pointer`}
+                onClick={() => router.push("/dashboard/sessions")}
               >
                Recent Activity
                 <Book

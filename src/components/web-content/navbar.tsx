@@ -25,16 +25,13 @@ const NavbarWeb = () => {
       {/* NAV LINKS */}
       <ul className="flex items-center gap-6 font-inter font-extralight tracking-wide text-muted-foreground">
         <li>
-          <Link href="/web" className="flex items-center gap-2">Services <LuChevronDown /></Link>
+          <a href="/web#services" className="flex items-center gap-2">Services <LuChevronDown /></a>
         </li>
         <li>
-          <Link href="/web/">About us</Link>
+          <a href="/web#about">About us</a>
         </li>
         <li>
-          <Link href="/web">Pricing</Link>
-        </li>
-        <li>
-          <Link href="/web">Reach us</Link>
+          <Link href="/home/settings/billing">Pricing</Link>
         </li>
       </ul>
 

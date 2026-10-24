@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from "next/server";
+import { getServerSession } from "@/lib/auth/session";
 import { PDFLoader } from "@langchain/community/document_loaders/fs/pdf";
 import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
 import { GoogleGenerativeAIEmbeddings } from "@langchain/google-genai";
@@ -8,6 +9,12 @@ import { PineconeStore } from "@langchain/pinecone";
 
 export async function POST() {
   try {
+    // Indexing burns provider quota, so it is never anonymous.
+    const session = await getServerSession();
+    if (!session || !session.userId) {
+      return NextResponse.json({ success: false, error: "Authentication required." }, { status: 401 });
+    }
+
     const PDF_PATH = "./public/CarrerUSAdataset.pdf";
 
     const pdfLoader = new PDFLoader(PDF_PATH);

@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Send } from "lucide-react";
 import { useUserData } from "@/context/UserDataProvider";
+import { toast } from "sonner";
 
 type Profile = {
   id: any;
@@ -143,17 +144,25 @@ const MessagesId = () => {
   const sendMessage = async () => {
     if (!text.trim() || !user?.id || !profileId || !profileType) return;
 
-    const { error } = await supabase.from("messages").insert({
-      sender_id: user.id,
-      receiver_id: profileId,
-      receiver_type: profileType,
-      content: text,
-    });
+    const { data: inserted, error } = await supabase
+      .from("messages")
+      .insert({
+        sender_id: user.id,
+        receiver_id: profileId,
+        receiver_type: profileType,
+        content: text,
+      })
+      .select();
 
     if (error) {
       console.error("Send error:", error);
+      toast.error("Your message could not be sent. Please try again.");
     } else {
-      setText(""); 
+      setText("");
+      // Realtime is not available on this deployment, so show the message the
+      // moment it is stored instead of waiting for a reload.
+      const row = Array.isArray(inserted) ? inserted[0] : inserted;
+      if (row) setMessages((prev) => [...prev, row as Message]);
     }
   };
 
@@ -211,12 +220,13 @@ const MessagesId = () => {
       </div>
       <div className="flex border-t p-3 gap-2 ">
         <Input
+          aria-label="Message"
           placeholder="Type a message..."
           value={text}
           onChange={(e) => setText(e.target.value)}
           className="flex-1 bg-blue-100"
         />
-        <Button onClick={sendMessage}>
+        <Button onClick={sendMessage} aria-label="Send message">
           <Send size={16} />
         </Button>
       </div>

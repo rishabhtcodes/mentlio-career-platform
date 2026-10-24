@@ -6,7 +6,7 @@ import { DBUser, UserQuizData } from "@/lib/types/allTypes";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
-import MessageNamesList from "../home/test/showchats/page";
+import MessageNamesList from "./MessageNamesList";
 import { useQuizData } from "@/context/userQuizProvider";
 
 type Message = {

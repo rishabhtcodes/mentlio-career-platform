@@ -2,11 +2,16 @@ import { NextResponse } from "next/server";
 import { Storage } from "@google-cloud/storage";
 import { promises as fs } from "fs";
 import path from "path";
+import { getServerSession } from "@/lib/auth/session";
 
-export async function GET() {
+export async function POST() {
+  const session = await getServerSession();
+  if (!session) {
+    return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+  }
   try {
     if (!process.env.GCP_SERVICE_ACCOUNT_KEY || !process.env.GCP_BUCKET_ASSETS) {
-      return NextResponse.json({ error: "GCP credentials or bucket not configured" }, { status: 500 });
+      return NextResponse.json({ error: "GCP credentials or bucket not configured" }, { status: 503 });
     }
 
     const storage = new Storage({

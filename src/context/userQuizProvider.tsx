@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useUserData } from "@/context/UserDataProvider";
+import { getUserQuizData } from "@/lib/functions/dbActions";
 import { UserQuizData } from "@/lib/types/allTypes";
 
 type QuizContextType = {
@@ -30,16 +31,11 @@ export const QuizDataProvider = ({
     if (!user || loading || user?.isQuizDone == false) return;
 
     setLoadingQuiz(true);
-    const { data, error } = await supabase
-      .from("userQuizData")
-      .select("*")
-      .eq("userId", user.id)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .single();
-
-    if (!error) setQuizData(data as UserQuizData);
-
+    // Route through the shared accessor so the provider sees the same ordering
+    // and career backfill as every other reader: a retake inserts a new row with
+    // no selectedCareer, and reading only that row made the career disappear.
+    const rows = await getUserQuizData(user.id);
+    setQuizData(rows[0] ?? null);
     setLoadingQuiz(false);
   };
 

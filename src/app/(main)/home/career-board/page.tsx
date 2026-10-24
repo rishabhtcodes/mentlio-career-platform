@@ -1,18 +1,15 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Cpu, TrendingUp, Users, ListChecks } from "lucide-react";
 import { useUserData } from "@/context/UserDataProvider";
-import { createClient } from "@/lib/supabase/client";
-import { getUserQuizData } from "@/lib/functions/dbActions";
 import IndustryCharts from "../../_components/industryCharts";
 import CareerTabsDemo from "../../_components/industryJobs";
 import SingleCard from "../../_components/IndustrySingleCard";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { useQuizData } from "@/context/userQuizProvider";
-import CoursesList from "../../_components/CourseData";
 
 const skills = [
   "Python",
@@ -23,13 +20,29 @@ const skills = [
 ];
 
 const CareerBoard = () => {
-  const { user, loading } = useUserData();
+  const { user } = useUserData();
   const router = useRouter();
   const { quizData } = useQuizData();
 
+  const hasInsights = user?.isQuizDone !== false && !!quizData?.selectedCareer;
+
+  const handleCardAction = (cardId: number) => {
+    if (cardId === 2) {
+      router.push("/start-quiz");
+      return;
+    }
+    if (!hasInsights) {
+      router.push("/start-quiz");
+      return;
+    }
+    document
+      .getElementById("industry-insights")
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   return (
     <div className="bg-gray-50 w-full h-full p-4 pt-8">
-      <SingleCard />
+      <SingleCard onAction={handleCardAction} />
 
       {user?.isQuizDone === false ? (
         <div className="mt-20 flex flex-col items-center justify-center gap-6 text-center">
@@ -148,7 +161,11 @@ const CareerBoard = () => {
               </CardContent>
             </Card>
           </div>
-          <div className="w-full mt-20 px-4">
+          <p className="px-4 mt-3 text-xs text-muted-foreground font-inter">
+            Growth, demand, and skill benchmarks are general industry figures,
+            not personalized to your selected career yet.
+          </p>
+          <div id="industry-insights" className="w-full mt-10 px-4">
             <IndustryCharts />
           </div>
           <div className="mt-20">

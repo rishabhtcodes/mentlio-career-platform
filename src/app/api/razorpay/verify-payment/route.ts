@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { getServerSession } from "@/lib/auth/session";
-import { getTable, mutateTable } from "@/lib/auth/db";
+import { getTable } from "@/lib/auth/db";
+import { finalizePaidOrder } from "@/lib/payments/finalize-order";
 
 export async function POST(req: NextRequest) {
   try {
@@ -33,45 +34,33 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 2. Prevent replay attacks / duplicate activations
-    if (order.status === "paid") {
-      return NextResponse.json({
-        success: true,
-        message: "Payment already verified and credited",
-        alreadyProcessed: true,
-        credits: order.credits,
-        isPro: order.isPro,
-      });
-    }
-
-    // 3. Signature verification
-    const key_secret = process.env.RAZORPAY_KEY_SECRET;
-    let isValid = false;
-
+    // 2. Signature verification against the live Razorpay merchant secret.
+    // Test-simulator orders are finalized only by the dev-only simulate endpoint,
+    // so a browser can never self-credit by guessing a signature.
     if (order.isSimulated) {
-      // Verified against test simulator secret
-      const expectedSimulatedSig = crypto
-        .createHmac("sha256", "mentlio_simulator_secret_key")
-        .update(`${razorpay_order_id}|${razorpay_payment_id}`)
-        .digest("hex");
-
-      isValid =
-        razorpay_signature === expectedSimulatedSig ||
-        razorpay_signature === `sig_valid_${razorpay_order_id}`;
-    } else {
-      if (!key_secret) {
-        return NextResponse.json(
-          { success: false, message: "Server payment configuration missing" },
-          { status: 500 }
-        );
-      }
-      const expectedSignature = crypto
-        .createHmac("sha256", key_secret)
-        .update(`${razorpay_order_id}|${razorpay_payment_id}`)
-        .digest("hex");
-
-      isValid = expectedSignature === razorpay_signature;
+      return NextResponse.json(
+        { success: false, message: "Simulated orders cannot be verified here." },
+        { status: 400 }
+      );
     }
+
+    const key_secret = process.env.RAZORPAY_KEY_SECRET;
+    if (!key_secret) {
+      return NextResponse.json(
+        { success: false, message: "Server payment configuration missing" },
+        { status: 500 }
+      );
+    }
+
+    const expectedSignature = crypto
+      .createHmac("sha256", key_secret)
+      .update(`${razorpay_order_id}|${razorpay_payment_id}`)
+      .digest("hex");
+
+    const expected = Buffer.from(expectedSignature, "utf8");
+    const provided = Buffer.from(String(razorpay_signature), "utf8");
+    const isValid =
+      expected.length === provided.length && crypto.timingSafeEqual(expected, provided);
 
     if (!isValid) {
       console.warn("❌ Invalid payment signature detected for order:", razorpay_order_id);
@@ -81,71 +70,26 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 4. Mark order as paid
-    mutateTable("orders", (currentOrders) =>
-      currentOrders.map((o) =>
-        o.orderId === razorpay_order_id
-          ? {
-              ...o,
-              status: "paid",
-              paymentId: razorpay_payment_id,
-              paid_at: new Date().toISOString(),
-            }
-          : o
-      )
-    );
-
-    // 5. Record verified payment in payments table
-    const paymentRecord = {
-      id: `pay_${Date.now()}`,
-      orderId: razorpay_order_id,
-      paymentId: razorpay_payment_id,
-      userId: session.userId,
-      userEmail: session.email,
-      planName: order.planName,
-      amount: order.amount,
-      currency: order.currency,
-      creditsGranted: order.credits || 0,
-      isPro: !!order.isPro,
-      status: "captured",
-      created_at: new Date().toISOString(),
-    };
-
-    mutateTable("payments", (payments) => [...payments, paymentRecord]);
-
-    // 6. Transactionally update user credits & plan entitlement
-    let updatedCredits = 0;
-    let userIsPro = false;
-
-    mutateTable("users", (users) =>
-      users.map((u) => {
-        if (String(u.id) === String(session.userId) || u.userEmail === session.email) {
-          const currentTotal = u.totalCredits || 10;
-          const currentRemaining = u.remainingCredits || 10;
-          const additional = order.credits || 0;
-          updatedCredits = currentRemaining + additional;
-          userIsPro = order.isPro ? true : !!u.isPro;
-
-          return {
-            ...u,
-            totalCredits: currentTotal + additional,
-            remainingCredits: updatedCredits,
-            isPro: userIsPro,
-            updated_at: new Date().toISOString(),
-          };
-        }
-        return u;
-      })
-    );
+    // 3. Mark paid, record the payment and grant entitlements.
+    const result = finalizePaidOrder(razorpay_order_id, razorpay_payment_id, session);
+    if (!result.ok) {
+      return NextResponse.json(
+        { success: false, message: result.message },
+        { status: result.status }
+      );
+    }
 
     return NextResponse.json({
       success: true,
-      message: "Payment verified successfully! Entitlements updated.",
+      message: result.alreadyProcessed
+        ? "Payment already verified and credited"
+        : "Payment verified successfully! Entitlements updated.",
       paymentId: razorpay_payment_id,
-      creditsAdded: order.credits,
-      totalRemainingCredits: updatedCredits,
-      isPro: userIsPro,
-      planName: order.planName,
+      creditsAdded: result.creditsAdded,
+      totalRemainingCredits: result.totalRemainingCredits,
+      isPro: result.isPro,
+      planName: result.planName,
+      alreadyProcessed: result.alreadyProcessed,
     });
   } catch (error: any) {
     console.error("Error verifying payment:", error);

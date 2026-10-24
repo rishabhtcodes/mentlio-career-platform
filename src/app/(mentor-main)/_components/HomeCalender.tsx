@@ -113,7 +113,7 @@ export function HomeCalendar() {
       days.push(
         <div
           key={day}
-          className={`h-8 w-8 flex items-center justify-center text-sm rounded-full cursor-pointer transition-colors ${
+          className={`h-8 w-full max-w-8 flex items-center justify-center text-sm rounded-full cursor-pointer transition-colors ${
             isToday
               ? "bg-blue-600 text-white"
               : hasMeeting
@@ -135,13 +135,13 @@ export function HomeCalendar() {
         <div className="flex items-center justify-between gap-2">
           <CardTitle className="text-base font-medium text-black font-inter tracking-tight">Calendar</CardTitle>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={prevMonth}>
+            <Button variant="ghost" size="sm" aria-label="Previous month" onClick={prevMonth}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <span className="text-sm font-medium max-w-[130px] text-center shrink-0 tracking-tight">
               {months[month]} {year}
             </span>
-            <Button variant="ghost" size="sm" onClick={nextMonth}>
+            <Button variant="ghost" size="sm" aria-label="Next month" onClick={nextMonth}>
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>

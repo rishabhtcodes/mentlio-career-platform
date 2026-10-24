@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from '@/lib/auth/session';
 import { getQuestionPipeline } from '@/lib/functions/MockTest/QuestionPipeline';
 import { DifficultyLevel } from '@/lib/functions/MockTest/QuizStore';
 
@@ -8,6 +9,10 @@ export const revalidate = 0;
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await getServerSession();
+    if (!session) {
+      return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+    }
     const body = await request.json();
     const { careerPath, difficulty, count = 10, timestamp, random, sessionId, forceNew } = body;
 

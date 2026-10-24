@@ -2,7 +2,7 @@
 "use client";
 
 import { useUserData } from "@/context/UserDataProvider";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { LuLoader } from "react-icons/lu";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -56,27 +56,46 @@ export default function CallbackPage() {
   const supabase = createClient();
   const router = useRouter();
   const { user, loading, ensureUserInDB, isNewUser } = useUserData();
-
-  // useEffect(() => {
-  //   ensureUserInDB();
-  // }, []);
+  const [authChecked, setAuthChecked] = useState(false);
+  const welcomedRef = useRef(false);
 
   useEffect(() => {
-    if (!loading && user) {
-      const isOnboardingIncomplete =
-        typeof window !== "undefined" &&
-        localStorage.getItem("isOnboardingDone") === "false";
+    let cancelled = false;
+    (async () => {
+      await ensureUserInDB();
+      if (!cancelled) setAuthChecked(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
-      if (isNewUser) {
-        toast(`Welcome aboard, ${user?.userEmail}!`);
-      } else if (isOnboardingIncomplete || user?.is_verified === false) {
-        toast("Resuming your onboarding Process");
-      } else {
-        toast(`Welcome back, ${user?.userName}!`);
-        router.push("/home");
-      }
+  useEffect(() => {
+    if (authChecked && !loading && !user) {
+      router.push("/auth");
     }
-  }, [isNewUser, loading, user]);
+  }, [authChecked, loading, user, router]);
+
+  useEffect(() => {
+    // Wait for this session's own row: deciding from a stale/absent user is what
+    // let unverified accounts slip past onboarding into /home.
+    if (!authChecked || loading || !user || welcomedRef.current) return;
+    welcomedRef.current = true;
+
+    const needsOnboarding =
+      user.is_verified !== true ||
+      (typeof window !== "undefined" &&
+        localStorage.getItem("isOnboardingDone") === "false");
+
+    if (isNewUser) {
+      toast(`Welcome aboard, ${user?.userName || user?.userEmail}!`);
+    } else if (needsOnboarding) {
+      toast("Resuming your onboarding Process");
+    } else {
+      toast(`Welcome back, ${user?.userName}!`);
+      router.push("/home");
+    }
+  }, [authChecked, isNewUser, loading, user, router]);
 
   // localStorage.setItem("isOnboardingDone", "true");
 
@@ -108,7 +127,7 @@ export default function CallbackPage() {
       ? localStorage.getItem("isOnboardingDone")
       : null;
 
-  if (onboardingStatus === "false" || isNewUser) {
+  if (onboardingStatus === "false" || isNewUser || user?.is_verified !== true) {
     return (
       <div className="w-full h-screen relative bg-white overflow-hidden">
         <div

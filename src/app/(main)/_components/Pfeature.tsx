@@ -7,18 +7,17 @@ interface Feature {
   name: string
   free: boolean
   premium: boolean
-  enterprise: boolean
 }
 
 const FEATURES: Feature[] = [
-  { name: 'Unlimited Components', free: true, premium: true, enterprise: true },
-  { name: 'Easily edited and customized', free: true, premium: true, enterprise: true },
-  { name: 'Combine Files Mercurius', free: true, premium: true, enterprise: true },
-  { name: 'Health care included', free: false, premium: true, enterprise: true },
-  { name: 'Priority Support', free: false, premium: true, enterprise: true },
-  { name: 'Advanced Analytics', free: false, premium: false, enterprise: true },
-  { name: 'Custom Integrations', free: false, premium: false, enterprise: true },
-  { name: 'Dedicated Account Manager', free: false, premium: false, enterprise: true },
+  { name: 'AI career coach chat', free: true, premium: true },
+  { name: 'Career quiz & personalised career', free: true, premium: true },
+  { name: 'AI roadmap generation', free: true, premium: true },
+  { name: 'Mock tests with checkpoints', free: true, premium: true },
+  { name: 'Resume builder with print/export', free: true, premium: true },
+  { name: 'Mentor session booking (credits)', free: true, premium: true },
+  { name: 'Credits included', free: false, premium: true },
+  { name: 'Priority support', free: false, premium: true },
 ]
 
 export function PricingFeaturesTable() {
@@ -31,8 +30,7 @@ export function PricingFeaturesTable() {
             <tr>
               <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Features</th>
               <th className="px-6 py-4 text-center text-sm font-semibold text-gray-900">Free Plan</th>
-              <th className="px-6 py-4 text-center text-sm font-semibold text-gray-900">Premium Plan</th>
-              <th className="px-6 py-4 text-center text-sm font-semibold text-gray-900">Enterprise Plan</th>
+              <th className="px-6 py-4 text-center text-sm font-semibold text-gray-900">Pro Plan</th>
             </tr>
           </thead>
           {/* Table Body */}
@@ -49,13 +47,6 @@ export function PricingFeaturesTable() {
                 </td>
                 <td className="px-6 py-4 text-center">
                   {feature.premium ? (
-                    <Check className="mx-auto h-5 w-5 text-gray-800" />
-                  ) : (
-                    <span className="text-gray-300">—</span>
-                  )}
-                </td>
-                <td className="px-6 py-4 text-center">
-                  {feature.enterprise ? (
                     <Check className="mx-auto h-5 w-5 text-gray-800" />
                   ) : (
                     <span className="text-gray-300">—</span>

@@ -64,7 +64,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { BsSuitcase, BsSuitcase2 } from "react-icons/bs";
 import SuggestedCollegeScroll from "../_components/SuggestedCollegeScroll";
-import MessageNamesList from "./test/showchats/page";
+import MessageNamesList from "../_components/MessageNamesList";
 import confetti from "canvas-confetti";
 import AiSuggestedBoxHome from "../_components/AiSuggestedBoxHome";
 import { useNotificationStore } from "@/lib/store/NotificationStore";
@@ -412,7 +412,10 @@ export default function HomePage() {
             </div>
 
             {/* INBOX */}
-            <div className="w-full h-[370px] bg-white rounded-xl shadow p-4">
+            <div
+              id="inbox"
+              className="w-full h-[370px] bg-white rounded-xl shadow p-4"
+            >
               <div className="flex items-center justify-between px-4">
                 <h2 className="text-base font-inter font-semibold">Inbox</h2>
                 <LuMailbox className="text-gray-600 text-2xl" />
@@ -509,11 +512,12 @@ export default function HomePage() {
                     <CheckCircle className="w-6 h-6 text-white" />
                   </div>
                   <p className="font-sora text-center my-2 text-2xl font-semibold">
-                    Quiz Complete!
+                    {user?.isQuizDone ? "Quiz Complete!" : "Choose your path"}
                   </p>
                   <p className="text-gray-600 text-base leading-relaxed text-center font-inter">
-                    Congratulations on completing your personalized assessment.
-                    Now We will help you decide your future Career.
+                    {user?.isQuizDone
+                      ? "Congratulations on completing your personalized assessment. Now We will help you decide your future Career."
+                      : "You have not finished the career quiz yet. Your AI career adviser can still help you explore options and pick a path."}
                   </p>
 
                   <div className="space-y-3 py-2">

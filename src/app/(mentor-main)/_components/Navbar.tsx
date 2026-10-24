@@ -60,6 +60,21 @@ export default function Navbar() {
   const router = useRouter();
   const [signoutLoading, setSignoutLoading] = useState(false);
 
+  async function signOut() {
+    setSignoutLoading(true);
+    try {
+      await supabase.auth.signOut();
+      toast.success("Signed out successfully");
+      router.push("/auth-mentor");
+      router.refresh();
+    } catch (error) {
+      console.error("Error signing out:", error);
+      toast.error("Could not sign out. Please try again.");
+    } finally {
+      setSignoutLoading(false);
+    }
+  }
+
   return (
     <div className="bg-white border-b-[1px] border-gray-200 pt-3 pb-1 px-4 pr-8 flex items-center gap-10 justify-between ">
       <div>
@@ -69,8 +84,16 @@ export default function Navbar() {
       <div className="flex items-center gap-14">
         <div className="">
           <Tooltip>
-            <TooltipTrigger>
-              <LuBell className="text-[22px] text-black cursor-pointer" />
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                aria-label="Notifications"
+                className="h-auto p-0 text-black hover:bg-transparent"
+                onClick={() => router.push("/dashboard")}
+              >
+                <LuBell className="text-[22px] text-black" />
+              </Button>
             </TooltipTrigger>
             <TooltipContent>
               <p className="font-inter text-xs">Notifications</p>
@@ -80,15 +103,25 @@ export default function Navbar() {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             {loading ? (
-              <div className="flex items-center gap-2 pr-4 max-[1280px]:pr-0 rounded-full cursor-pointer">
+              <Button
+                type="button"
+                variant="ghost"
+                aria-label="Account menu is loading"
+                className="h-auto gap-2 border-0 bg-transparent p-0 pr-4 hover:bg-transparent focus-visible:ring-2 max-[1280px]:pr-0"
+              >
                 <div className="bg-gray-200 animate-pulse rounded-full h-12 w-12"></div>
                 <div className="flex flex-col font-inter tracking-tight gap-2 max-[1280px]:hidden">
                   <p className="bg-gray-200 animate-pulse rounded-md h-5 w-28"></p>
                   <p className="bg-gray-200 animate-pulse rounded-md h-5 w-24"></p>
                 </div>
-              </div>
+              </Button>
             ) : (
-              <div className="">
+              <Button
+                type="button"
+                variant="ghost"
+                aria-label="Open account menu"
+                className="h-auto gap-2 border-0 bg-transparent p-0 hover:bg-transparent focus-visible:ring-2"
+              >
                 <Image
                   src={mentor?.avatar || "/user.png"}
                   alt="User Avatar"
@@ -96,7 +129,7 @@ export default function Navbar() {
                   height={52}
                   className="rounded-full cursor-pointer"
                 />
-              </div>
+              </Button>
             )}
           </DropdownMenuTrigger>
           {!loading && (
@@ -127,18 +160,6 @@ export default function Navbar() {
 
               {/* Items */}
 
-              <DropdownMenuItem className="cursor-pointer flex justify-between pl-3 pr-6 py-2  rounded-none hover:bg-blue-50">
-                {/* <p className="flex items-center gap-3">
-                  <LuWallet className="h-6 w-6 text-black" />{" "}
-                  <span className="font-inter text-base tracking-tight">
-                    Coins:
-                  </span>
-                </p> */}
-
-                {/* <span className="font-semibold text-sm font-inter text-yellow-500 ">
-                  {user?.remainingCredits} / {user?.totalCredits}
-                </span> */}
-              </DropdownMenuItem>
               <DropdownMenuItem
                 className="cursor-pointer flex gap-3 px-3 py-2 hover:bg-blue-50"
                 onClick={() => router.push("/dashboard/profile")}
@@ -146,13 +167,6 @@ export default function Navbar() {
                 <LuUser className="h-6 w-6 text-black" />
                 <span className="font-inter text-base tracking-tight">
                   Profile
-                </span>
-              </DropdownMenuItem>
-
-              <DropdownMenuItem className="cursor-pointer flex gap-3 px-3 py-2 hover:bg-blue-50">
-                <LuSun className="h-6 w-6 text-black " />
-                <span className="font-inter text-base tracking-tight">
-                  Theme
                 </span>
               </DropdownMenuItem>
 
@@ -175,7 +189,7 @@ export default function Navbar() {
                       </AlertDialogTitle>
                       <AlertDialogDescription className="font-inter text-muted-foreground tracking-tight text-base">
                         This will end your session and you&apos;ll need to sign
-                        in again. Despite you can simply close the tab.
+                        in again. You can also simply close this tab.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -186,7 +200,7 @@ export default function Navbar() {
                         <Button
                           disabled={signoutLoading}
                           className="bg-blue-500 text-white hover:bg-blue-700 font-inter cursor-pointer"
-                          // onClick={signOut}
+                          onClick={signOut}
                         >
                           {signoutLoading ? (
                             <>

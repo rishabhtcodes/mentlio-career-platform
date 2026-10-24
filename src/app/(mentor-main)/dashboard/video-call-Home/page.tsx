@@ -168,7 +168,7 @@ const VideoCallHome = () => {
               </span>{" "}
               for a{" "}
               <span className="font-semibold text-blue-600">
-                {activeSession.session_type}
+                {activeSession.session_type.replace(/ session$/i, "")}
               </span>{" "}
               session?
             </DialogDescription>

@@ -43,6 +43,7 @@ const MyTrackStart = () => {
   }>({});
 
   const [youtubeData, setYoutubeData] = useState<Record<string, string[]>>({});
+  const [pendingVideos, setPendingVideos] = useState<Record<string, boolean>>({});
 
   const { setCareerPath, reset } = useQuizStore();
 
@@ -64,21 +65,23 @@ const MyTrackStart = () => {
 
       setTrack(data);
 
+      const checkpoints: Checkpoint[] = Array.isArray(data.checkpoints)
+        ? data.checkpoints
+        : [];
+
       // Detect the current checkpoint (first one where isMockDone == false)
-      const checkpoint = data.checkpoints.find(
-        (cp: Checkpoint) => !cp.isMockDone
-      );
+      const checkpoint = checkpoints.find((cp) => !cp.isMockDone);
 
       setCurrentCheckpoint(checkpoint || null);
 
-      const completedCheckpoints = data.checkpoints.filter(
-        (cp: Checkpoint) => cp.isMockDone
+      const completedCheckpoints = checkpoints.filter(
+        (cp) => cp.isMockDone
       ).length;
 
-      const totalCheckpoints = data.checkpoints.length;
-      const calculatedProgress = Math.round(
-        (completedCheckpoints / totalCheckpoints) * 100
-      );
+      const totalCheckpoints = checkpoints.length;
+      const calculatedProgress = totalCheckpoints
+        ? Math.round((completedCheckpoints / totalCheckpoints) * 100)
+        : 0;
 
       setProgress(calculatedProgress);
 
@@ -95,44 +98,41 @@ const MyTrackStart = () => {
   // ==================================
   const toggleSubtopic = async (checkpointIndex: number, subIndex: number) => {
     const key = `${checkpointIndex}-${subIndex}`;
+    const willOpen = !expandedSubtopics[key];
+
     setExpandedSubtopics((prev) => ({
       ...prev,
-      [key]: !prev[key],
+      [key]: willOpen,
     }));
-    if (youtubeData[key]) return;
 
-    const query = track?.checkpoints[checkpointIndex].subtopics[subIndex].title;
+    if (!willOpen || youtubeData[key] || pendingVideos[key]) return;
 
-    // Fetching videos
-    const videos = await fetchYouTubeVideos(query!);
+    const query =
+      track?.checkpoints[checkpointIndex]?.subtopics?.[subIndex]?.title;
+    if (!query) return;
 
-    // Saving only 2 in state...
-    setYoutubeData((prev) => ({
-      ...prev,
-      [key]: videos,
-    }));
+    setPendingVideos((prev) => ({ ...prev, [key]: true }));
+    const videos = await fetchYouTubeVideos(query);
+    setYoutubeData((prev) => ({ ...prev, [key]: videos }));
+    setPendingVideos((prev) => ({ ...prev, [key]: false }));
   };
   // ================================
   // FETCH YT VIDEO=======================
   const fetchYouTubeVideos = async (query: string) => {
     try {
-      const apiKey = process.env.NEXT_PUBLIC_YOUTUBE_API_KEY;
+      // Server-side proxy: keeps the YouTube API key out of the browser bundle.
+      const res = await axios.get(`/api/youtube/search`, {
+        params: {
+          q: query,
+          maxResults: 2,
+          videoDuration: "medium",
+        },
+      });
 
-      const res = await axios.get(
-        `https://www.googleapis.com/youtube/v3/search`,
-        {
-          params: {
-            part: "snippet",
-            q: query,
-            maxResults: 2,
-            key: apiKey,
-            type: "video",
-            videoDuration: "medium",
-          },
-        }
-      );
+      const items = res.data?.items;
+      if (!Array.isArray(items)) return [];
 
-      return res.data.items?.map(
+      return items.map(
         (item: any) => `https://www.youtube.com/watch?v=${item.id.videoId}`
       );
     } catch (err) {
@@ -171,6 +171,10 @@ const MyTrackStart = () => {
     );
   }
 
+  const checkpoints: Checkpoint[] = Array.isArray(track.checkpoints)
+    ? track.checkpoints
+    : [];
+
   return (
     <div className="bg-gray-50 w-full min-h-screen p-4">
       {/* DISPLAY CARD */}
@@ -179,7 +183,7 @@ const MyTrackStart = () => {
           Complete your track
         </h2>
         <p className="text-gray-200 font-inter text-lg mt-3 max-w-[340px] ml-4">
-          Complete all checkpoints to unlock your acheivement and earn skills
+          Complete all checkpoints to unlock your achievement and earn skills
         </p>
         <Image
           src="/8.png"
@@ -241,9 +245,9 @@ const MyTrackStart = () => {
           </h2>
           {/* Progress Line */}
           <div className="relative flex flex-col items-center">
-            {track.checkpoints.map((checkpoint: Checkpoint, index: number) => {
+            {checkpoints.map((checkpoint: Checkpoint, index: number) => {
               const isUnlocked =
-                index === 0 || track.checkpoints[index - 1].isMockDone === true;
+                index === 0 || checkpoints[index - 1].isMockDone === true;
 
               return (
                 <div
@@ -273,7 +277,7 @@ const MyTrackStart = () => {
                   </span>
 
                   {/* Vertical line except last checkpoint */}
-                  {index !== track.checkpoints.length - 1 && (
+                  {index !== checkpoints.length - 1 && (
                     <div
                       className={`
                   w-[3px] h-12 rounded-full my-1
@@ -290,9 +294,9 @@ const MyTrackStart = () => {
         {/* =============RIGHT SIDE ALL CHECKPOINTS=============== */}
         <div className="space-y-14 flex-1 max-w-[840px] mx-auto">
           {/* ======= All Checkpoints (Locked / Unlocked) ======= */}
-          {track.checkpoints.map((checkpoint: Checkpoint, index: number) => {
+          {checkpoints.map((checkpoint: Checkpoint, index: number) => {
             const isUnlocked =
-              index === 0 || track.checkpoints[index - 1].isMockDone === true;
+              index === 0 || checkpoints[index - 1].isMockDone === true;
 
             return (
               <div
@@ -326,8 +330,15 @@ const MyTrackStart = () => {
                       </span>
                     )}
 
-                    <div
-                      className="w-9 h-9 bg-white border rounded-full flex items-center justify-center cursor-pointer"
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      disabled={!isUnlocked}
+                      aria-expanded={expandedIndex === index}
+                      aria-label={`${
+                        expandedIndex === index ? "Collapse" : "Expand"
+                      } checkpoint ${checkpoint.checkpoint_order}: ${checkpoint.title}`}
+                      className="h-9 w-9 shrink-0 rounded-full border bg-white p-0 hover:bg-gray-50 focus-visible:ring-2"
                       onClick={() =>
                         setExpandedIndex(expandedIndex === index ? null : index)
                       }
@@ -337,7 +348,7 @@ const MyTrackStart = () => {
                           expandedIndex === index ? "rotate-180" : "rotate-0"
                         }`}
                       />
-                    </div>
+                    </Button>
                   </div>
                 </div>
 
@@ -347,6 +358,7 @@ const MyTrackStart = () => {
 
                 {/* ====== COLLAPSIBLE CONTENT ====== */}
                 <div
+                  inert={expandedIndex !== index}
                   className={`transition-all duration-300 overflow-hidden ${
                     expandedIndex === index
                       ? "max-h-[2000px] opacity-100"
@@ -359,7 +371,7 @@ const MyTrackStart = () => {
                       Subtopics <LuGalleryVerticalEnd className="inline ml-2" />
                     </h3>
 
-                    {checkpoint.subtopics.map((sub, subIndex) => {
+                    {(checkpoint.subtopics || []).map((sub, subIndex) => {
                       const subKey = `${index}-${subIndex}`;
                       const isSubOpen = expandedSubtopics[subKey];
 
@@ -369,8 +381,11 @@ const MyTrackStart = () => {
                           className="bg-gray-50 p-3 rounded-lg border shadow"
                         >
                           {/* SUBTOPIC HEADER */}
-                          <div
-                            className="flex items-center justify-between cursor-pointer"
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            aria-expanded={!!isSubOpen}
+                            className="flex w-full items-center justify-between gap-3 rounded-md bg-transparent p-0 text-left hover:bg-transparent focus-visible:ring-2"
                             onClick={() => toggleSubtopic(index, subIndex)}
                           >
                             <h4 className="font-semibold text-lg font-inter capitalize text-blue-600">
@@ -382,10 +397,11 @@ const MyTrackStart = () => {
                                 isSubOpen ? "rotate-180" : "rotate-0"
                               }`}
                             />
-                          </div>
+                          </Button>
 
                           {/* SUBTOPIC CONTENT (collapsible) */}
                           <div
+                            inert={!isSubOpen}
                             className={`transition-all duration-300 overflow-hidden ${
                               isSubOpen
                                 ? "max-h-[1000px] opacity-100"
@@ -401,7 +417,7 @@ const MyTrackStart = () => {
                                 Resources:
                               </p>
                               <div className="list-disc ml-5 mt-3 text-sm text-black font-sora space-y-4">
-                                {sub.resources.map((link, idx) => (
+                                {(sub.resources || []).map((link, idx) => (
                                   <div
                                     key={idx}
                                     className=" bg-gradient-to-br from-pink-100 via-white to-white px-3 py-4 rounded-lg shadow border"
@@ -425,11 +441,19 @@ const MyTrackStart = () => {
                               </p>
 
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3">
-                                {!youtubeData[`${index}-${subIndex}`] && (
+                                {pendingVideos[subKey] && (
                                   <p className="text-gray-500">
                                     Loading videos...
                                   </p>
                                 )}
+
+                                {youtubeData[subKey]?.length === 0 &&
+                                  !pendingVideos[subKey] && (
+                                    <p className="text-sm text-gray-500">
+                                      No YouTube videos could be loaded for this
+                                      subtopic.
+                                    </p>
+                                  )}
 
                                 {youtubeData[`${index}-${subIndex}`]?.map(
                                   (yt, i) => (
@@ -457,7 +481,7 @@ const MyTrackStart = () => {
                     </h3>
 
                     <div className="grid grid-cols-2 gap-5 mt-3">
-                      {checkpoint.skills.map((skill, idx) => (
+                      {(checkpoint.skills || []).map((skill, idx) => (
                         <div key={idx} className="flex items-center gap-2">
                           <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
                             <LuCheck className="text-white text-[18px] inline" />
@@ -476,7 +500,7 @@ const MyTrackStart = () => {
                     </h3>
 
                     <div className="grid grid-cols-2 gap-5 mt-3">
-                      {checkpoint.topics_covered.map((topic, idx) => (
+                      {(checkpoint.topics_covered || []).map((topic, idx) => (
                         <div key={idx} className="flex items-center gap-2">
                           <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
                             <LuCheckCheck className="text-white text-[18px] inline" />
@@ -496,6 +520,7 @@ const MyTrackStart = () => {
                   </h2>
                   <Button
                     onClick={() => handleMockTest(checkpoint)}
+                    disabled={!isUnlocked}
                     className="font-inter text-sm tracking-tight mt-4 ml-6 bg-gradient-to-br from-indigo-400 to-blue-400"
                     size="sm"
                   >

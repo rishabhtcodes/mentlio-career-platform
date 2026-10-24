@@ -88,12 +88,15 @@ type FormData = {
   profession?: Profession;
   // Step 3
   focus?: string;
+  // Step 5
+  invites: string[];
 };
 
 export function OnboardingCard() {
   const [step, setStep] = useState<number>(1);
   const [busy, setBusy] = useState<boolean>(false);
   const [emailInput, setEmailInput] = useState<string>("");
+  const [referralLink, setReferralLink] = useState<string>("");
   const { user } = useUserData();
 
   const supabase = createClient();
@@ -115,6 +118,7 @@ export function OnboardingCard() {
     institution: "",
     profession: undefined,
     focus: undefined,
+    invites: [],
     // calendarConnected: false,
   });
 
@@ -167,31 +171,74 @@ export function OnboardingCard() {
       return;
     }
 
+    const normalised = v.toLowerCase();
+    if (data.invites.includes(normalised)) {
+      setEmailInput("");
+      return;
+    }
+    setData((prev) => ({ ...prev, invites: [...prev.invites, normalised] }));
     setEmailInput("");
-  }
-
-  // copy the link
-  async function copyReferral() {
-    if (!user) return;
-
-    const link = `${window.location.origin}/invite/${user.invite_link}`;
-
-    await navigator.clipboard.writeText(link);
-
-    toast("Referral link copied", {
+    toast("Added to your invite list", {
       description: (
         <span className="text-gray-600 font-inter">
-          Now you can share it with your friends
+          {normalised} is saved with your profile
         </span>
       ),
     });
   }
 
-  // SHARE the link
-  async function shareReferral() {
-    if (!user) return;
+  function removeInvite(email: string) {
+    setData((prev) => ({
+      ...prev,
+      invites: prev.invites.filter((e) => e !== email),
+    }));
+  }
+
+  // copy the link
+  async function copyReferral() {
+    if (!user?.invite_link) {
+      toast.error("Referral link unavailable", {
+        description: (
+          <span className="text-gray-600 font-inter">
+            Sign out and back in, then try again.
+          </span>
+        ),
+      });
+      return;
+    }
 
     const link = `${window.location.origin}/invite/${user.invite_link}`;
+    setReferralLink(link);
+
+    try {
+      await navigator.clipboard.writeText(link);
+      toast("Referral link copied", {
+        description: (
+          <span className="text-gray-600 font-inter">
+            Now you can share it with your friends
+          </span>
+        ),
+      });
+    } catch {
+      toast.error("Your browser blocked automatic copying", {
+        description: (
+          <span className="text-gray-600 font-inter">
+            Select the link below and copy it manually.
+          </span>
+        ),
+      });
+    }
+  }
+
+  // SHARE the link
+  async function shareReferral() {
+    if (!user?.invite_link) {
+      toast.error("Referral link unavailable");
+      return;
+    }
+
+    const link = `${window.location.origin}/invite/${user.invite_link}`;
+    setReferralLink(link);
 
     if (navigator.share) {
       try {
@@ -224,6 +271,10 @@ export function OnboardingCard() {
         is_verified: true,
       };
 
+      if (data.invites.length > 0) {
+        updatePayload.invites = data.invites;
+      }
+
       // only update userName if it's filled
       if (data.name && data.name.trim() !== "") {
         updatePayload.userName = data.name.trim();
@@ -237,6 +288,13 @@ export function OnboardingCard() {
 
       if (error) {
         console.error("❌ Error updating user:", error.message);
+        toast.error("We could not save your onboarding details.", {
+          description: (
+            <span className="text-gray-600 font-inter">
+              Please check your connection and try again.
+            </span>
+          ),
+        });
         return;
       }
 
@@ -247,6 +305,11 @@ export function OnboardingCard() {
       router.push("/home");
     } catch (err) {
       console.error("❌ Unexpected error:", err);
+      toast.error("Something went wrong while finishing setup.", {
+        description: (
+          <span className="text-gray-600 font-inter">Please try again.</span>
+        ),
+      });
     } finally {
       setLoading(false);
     }
@@ -342,7 +405,7 @@ export function OnboardingCard() {
               </div>
             </div>
             <p className="text-sm -mt-3 font-inter text-muted-foreground">
-              Make sure to write full name of your school Instituion/school.
+              Make sure to write full name of your school Institution/school.
             </p>
           </section>
         )}
@@ -433,7 +496,7 @@ export function OnboardingCard() {
         )}
 
         {step === 4 && (
-          <section className="space-y-4" aria-label="Connect Google Calendar">
+          <section className="space-y-4" aria-label="Referral source">
             <div className="rounded-md border p-4">
               <div className="flex gap-3 w-full">
                 <div className="space-y-1 w-full">
@@ -491,7 +554,7 @@ export function OnboardingCard() {
                   Add
                 </Button>
               </div>
-              {/* {!!data.invites.length && (
+              {!!data.invites.length && (
                 <div className="flex flex-wrap gap-2 pt-2">
                   {data.invites.map((e) => (
                     <span
@@ -510,7 +573,7 @@ export function OnboardingCard() {
                     </span>
                   ))}
                 </div>
-              )} */}
+              )}
             </div>
 
             <div className="space-y-2">
@@ -533,6 +596,15 @@ export function OnboardingCard() {
                   Share
                 </Button>
               </div>
+              {!!referralLink && (
+                <Input
+                  readOnly
+                  value={referralLink}
+                  onFocus={(e) => e.target.select()}
+                  aria-label="Your referral link"
+                  className="mt-3 bg-blue-50 border-blue-200 font-inter"
+                />
+              )}
               <p className="text-sm text-muted-foreground font-inter mt-4">
                 Friends who join with your link may unlock bonus resources for
                 you.
@@ -572,7 +644,7 @@ export function OnboardingCard() {
                 </>
               ) : (
                 <>
-                  Complete SetUp <LuActivity className="ml-2" />
+                  Complete Setup <LuActivity className="ml-2" />
                 </>
               )}
             </Button>

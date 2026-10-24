@@ -1,10 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { NextResponse } from "next/server";
-import { ChatGroq } from "@langchain/groq";
 import { PromptTemplate } from "@langchain/core/prompts";
 import { StructuredOutputParser } from "@langchain/core/output_parsers";
 import { z } from "zod";
+import { getServerSession } from "@/lib/auth/session";
+import { groqComplete, llmErrorResponse } from "@/lib/ai/groq";
 
 interface FeedbackRequest {
   conversation: { type: "user" | "assistant"; content: string }[];
@@ -51,23 +52,19 @@ Output ONLY JSON in this exact format:
 
 export async function POST(request: Request) {
   try {
+    const session = await getServerSession();
+    if (!session) {
+      return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+    }
     const apiKey = process.env.GROQ_API_KEY;
     if (!apiKey) {
       return NextResponse.json(
-        { isError: true, error: "GROQ_API_KEY is not configured" },
-        { status: 500 }
+        { isError: true, error: "The language model is not configured on this server.", code: "LLM_UNCONFIGURED" },
+        { status: 503 }
       );
     }
 
     const modelName = process.env.GROQ_MODEL || "openai/gpt-oss-120b";
-
-    const llm = new ChatGroq({
-      apiKey,
-      model: modelName,
-      temperature: 0.3,
-      maxTokens: 2000,
-    });
-    const chain = promptTemplate.pipe(llm).pipe(parser);
 
     const body: FeedbackRequest = await request.json();
     const { conversation } = body;
@@ -83,13 +80,26 @@ export async function POST(request: Request) {
       .map((m) => `${m.type === "user" ? "User" : "Assistant"}: ${m.content}`)
       .join("\n");
 
-    const input = {
+    const promptText = await promptTemplate.format({
       conversation: conversationString,
       format_instructions: parser.getFormatInstructions(),
-    };
+    });
 
-    // added any to remove ts errors.
-    const result: any = await chain.invoke(input);
+    const rawText = await groqComplete({
+      prompt: promptText,
+      model: modelName,
+      temperature: 0.3,
+      maxTokens: 2000,
+    });
+
+    let result: any;
+    try {
+      result = await parser.parse(rawText);
+    } catch {
+      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) throw new Error("The model did not return usable JSON.");
+      result = JSON.parse(jsonMatch[0]);
+    }
 
     const finalResult = {
       feedback: {
@@ -104,11 +114,7 @@ export async function POST(request: Request) {
     };
 
     return NextResponse.json({ data: finalResult });
-  } catch (error: any) {
-    console.error("❌ FEEDBACK ERROR:", error);
-    return NextResponse.json(
-      { isError: true, error: error.message || "Failed to generate feedback" },
-      { status: 500 }
-    );
+  } catch (error) {
+    return llmErrorResponse(error);
   }
 }

@@ -4,6 +4,10 @@ import { createSessionToken, setServerSessionCookie } from "@/lib/auth/session";
 import { getTable, mutateTable } from "@/lib/auth/db";
 import { v4 as uuidv4 } from "uuid";
 
+// public/ ships a single placeholder avatar. The previous `/user{n}.png`
+// randomisation produced paths that 404 for every new account.
+const DEFAULT_AVATAR = "/user.png";
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -18,6 +22,21 @@ export async function POST(req: NextRequest) {
         { error: "Password must be at least 6 characters long." },
         { status: 400 }
       );
+    }
+    if (password.length > 128) {
+      return NextResponse.json(
+        { error: "Password must be at most 128 characters long." },
+        { status: 400 }
+      );
+    }
+    if (fullName !== undefined && (typeof fullName !== "string" || fullName.length > 120)) {
+      return NextResponse.json(
+        { error: "Full name must be a string of at most 120 characters." },
+        { status: 400 }
+      );
+    }
+    if (avatar !== undefined && typeof avatar !== "string") {
+      return NextResponse.json({ error: "Invalid avatar value." }, { status: 400 });
     }
 
     const normalizedEmail = email.trim().toLowerCase();
@@ -58,7 +77,7 @@ export async function POST(req: NextRequest) {
         current_position: "",
         availability: true,
         rating: 0,
-        avatar: avatar || `/user${Math.ceil(Math.random() * 5)}.png`,
+        avatar: avatar || DEFAULT_AVATAR,
         created_at: createdAt,
         is_verified: false,
         video_url: null,
@@ -69,7 +88,7 @@ export async function POST(req: NextRequest) {
         userName: fullName || normalizedEmail.split("@")[0],
         userEmail: normalizedEmail,
         passwordHash,
-        avatar: avatar || `/user${Math.ceil(Math.random() * 5)}.png`,
+        avatar: avatar || DEFAULT_AVATAR,
         created_at: createdAt,
         totalCredits: 10,
         remainingCredits: 10,

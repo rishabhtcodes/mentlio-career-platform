@@ -39,6 +39,11 @@ import { createClient } from "@/lib/supabase/client";
 
 const VAPI_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY || "";
 
+// Vapi public keys are long "vk-…" strings; anything shorter, or obviously a
+// .env placeholder, must not be sent to api.vapi.ai.
+const isUsableVapiKey =
+  VAPI_PUBLIC_KEY.length >= 20 && !/^(dumm|placehold|your|chang)/i.test(VAPI_PUBLIC_KEY);
+
 interface Message {
   type: "user" | "assistant";
   content: string;
@@ -48,6 +53,7 @@ const InterviewStart = () => {
   const { user } = useUserData();
   const router = useRouter();
   const videoRef = useRef<HTMLVideoElement>(null);
+  const micStreamRef = useRef<MediaStream | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [isCameraOn, setIsCameraOn] = useState(false);
   const [isMicOn, setIsMicOn] = useState(false);
@@ -58,6 +64,7 @@ const InterviewStart = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [callFinished, setCallFinished] = useState<boolean>(false);
   const [feedbackloading, setFeedbackLoading] = useState<boolean>(false);
+  const [blockedReason, setBlockedReason] = useState<string | null>(null);
   const supabase = createClient();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -84,6 +91,13 @@ const InterviewStart = () => {
       setIsCameraOn(true);
     } catch (err) {
       console.error("Camera access error:", err);
+      toast.error("Camera permission was blocked.", {
+        description: (
+          <span className="text-gray-600 font-inter">
+            Allow camera access in your browser settings to use video proctoring.
+          </span>
+        ),
+      });
     }
   };
 
@@ -95,46 +109,60 @@ const InterviewStart = () => {
     if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
-    toast.success("Camera turned off");
     setIsCameraOn(false);
   };
 
   const toggleCamera = () => {
-    if (isCameraOn) stopCamera();
-    else startCamera();
+    if (isCameraOn) {
+      stopCamera();
+      toast.success("Camera turned off");
+    } else startCamera();
   };
 
   const toggleMic = async () => {
     if (isMicOn) {
+      micStreamRef.current?.getTracks().forEach((track) => track.stop());
+      micStreamRef.current = null;
       setIsMicOn(false);
       toast.success("Mic turned off");
     } else {
       try {
-        await navigator.mediaDevices.getUserMedia({ audio: true });
+        micStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
         setIsMicOn(true);
         toast.success("Mic turned on");
       } catch (err) {
         console.error("Mic access error:", err);
+        toast.error("Microphone permission was blocked.", {
+          description: (
+            <span className="text-gray-600 font-inter">
+              Allow microphone access in your browser settings so the interviewer can hear you.
+            </span>
+          ),
+        });
       }
     }
   };
  
   // ----------------------------VAPI SETUP--------------------------------
   useEffect(() => {
-    if (!interviewData) return;
-
-    if (!interviewData.jobTitle) {
-      toast.error("Job title is missing for this interview.");
+    if (!interviewData?.jobTitle) {
+      setLoading(false);
+      setBlockedReason(
+        "No interview session is loaded here. Generate your questions in AI Interview Prep, then press Start Interview."
+      );
+      return;
+    }
+    if (!isUsableVapiKey) {
+      setLoading(false);
+      setBlockedReason(
+        "Voice interviews need a Vapi public key. Set NEXT_PUBLIC_VAPI_PUBLIC_KEY and reload this page."
+      );
       return;
     }
     startCall();
   }, [interviewData]);
 
   const startCall = async () => {
-    if (!VAPI_PUBLIC_KEY || VAPI_PUBLIC_KEY === "dummy_vapi_key") {
-      toast.error("Vapi voice key is not configured. Please add NEXT_PUBLIC_VAPI_PUBLIC_KEY in .env.local to enable voice calls.");
-      return;
-    }
     const questionList = interviewData?.questions
       ?.map((q: any) => q.question)
       .join(", ");
@@ -205,37 +233,65 @@ Key Guidelines:
       console.log("🎤 Vapi Interview started successfully!");
     } catch (error) {
       console.error("❌ Error starting call:", error);
-      // setVapiError(error);
       setLoading(false);
+      setBlockedReason(
+        "The AI interviewer could not connect right now. End this session and start again."
+      );
     }
   };
 
-  vapi.on("speech-start", () => {
-    setActiveUser(true);
-  });
+  useEffect(() => {
+    const onSpeechStart = () => setActiveUser(true);
+    const onSpeechEnd = () => setActiveUser(false);
+    const onCallStart = () => {
+      setIsCallActive(true);
+      setLoading(false);
+      setBlockedReason(null);
+      toast.info("Interview Has been started", {
+        description: (
+          <span className="text-sm text-gray-500 font-medium">
+            Your Interview Has Been started!{" "}
+            <span className="text-blue-600">All the best</span>
+          </span>
+        ),
+      });
+    };
+    const onCallEnd = () => {
+      setIsCallActive(false);
+      setCallFinished(true);
+    };
+    const onMessage = (message: any) => {
+      if (message.type === "transcript" && message.transcriptType === "final") {
+        const role = message.role === "user" ? "user" : "assistant";
+        const content = message.transcript;
 
-  vapi.on("speech-end", () => {
-    setActiveUser(false);
-  });
+        setMessages((prev) => {
+          if (prev.length > 0) {
+            const lastMsg = prev[prev.length - 1];
+            if (lastMsg.type === role && lastMsg.content === content) {
+              return prev;
+            }
+          }
+          return [...prev, { type: role, content }];
+        });
+      }
+    };
 
-  vapi.on("call-start", () => {
-    console.log("Call has started");
-    setIsCallActive(true);
-    setLoading(false);
-    toast.info("Interview Has been started", {
-      description: (
-        <span className="text-sm text-gray-500 font-medium">
-          Your Interview Has Been started!{" "}
-          <span className="text-blue-600">All the best</span>
-        </span>
-      ),
-    });
-  });
+    vapi.on("speech-start", onSpeechStart);
+    vapi.on("speech-end", onSpeechEnd);
+    vapi.on("call-start", onCallStart);
+    vapi.on("call-end", onCallEnd);
+    vapi.on("message", onMessage);
 
-  vapi.on("call-end", () => {
-    setIsCallActive(false);
-    setCallFinished(true);
-  });
+    return () => {
+      vapi.off("speech-start", onSpeechStart);
+      vapi.off("speech-end", onSpeechEnd);
+      vapi.off("call-start", onCallStart);
+      vapi.off("call-end", onCallEnd);
+      vapi.off("message", onMessage);
+    };
+  }, [vapi]);
+
   useEffect(() => {
     if (callFinished) {
       GenerateFeedback();
@@ -252,6 +308,17 @@ Key Guidelines:
 
   // ------------------------GENERATE FEEDBACK FUNCTION------------
   const GenerateFeedback = async () => {
+    if (messages.length === 0) {
+      toast.info("No answers were recorded.", {
+        description: (
+          <span className="text-sm text-gray-500 font-medium">
+            We could not build insights because the transcript is empty.
+          </span>
+        ),
+      });
+      return;
+    }
+
     setFeedbackLoading(true);
 
     try {
@@ -260,9 +327,8 @@ Key Guidelines:
       });
 
       const feedbackData = response.data?.data;
-      console.log("🧠 Feedback Response:", feedbackData);
 
-      const { data, error } = await supabase.from("others").insert([
+      const { error } = await supabase.from("others").insert([
         {
           userId: user?.id,
           jobTitle: interviewData?.jobTitle,
@@ -270,11 +336,10 @@ Key Guidelines:
         },
       ]);
 
-      toast.success("Feedback generated successfully!");
-
       if (error) {
         console.error("❌ Supabase Insert Error:", error);
-        toast.error("Failed to save feedback to database!");
+        toast.error("Feedback was generated but could not be saved.");
+      } else {
         toast.success("Feedback generated successfully!");
       }
     } catch (error: any) {
@@ -285,40 +350,60 @@ Key Guidelines:
     }
   };
 
-  // ---------------------------VAPI MESSAGE SETUP--------------------------
-  useEffect(() => {
-    vapi.on("message", (message: any) => {
-      if (message.type === "transcript" && message.transcriptType === "final") {
-        const role = message.role === "user" ? "user" : "assistant";
-        const content = message.transcript;
+  const downloadTranscript = () => {
+    if (messages.length === 0) {
+      toast.info("No transcript yet.", {
+        description: (
+          <span className="text-gray-600 font-inter">
+            Answers appear here once you speak during the interview.
+          </span>
+        ),
+      });
+      return;
+    }
 
-        //  Prevent duplicates
-        setMessages((prev) => {
-          if (prev.length > 0) {
-            const lastMsg = prev[prev.length - 1];
-            if (lastMsg.type === role && lastMsg.content === content) {
-              return prev;
-            }
-          }
-          return [...prev, { type: role, content }];
-        });
-      }
-    });
-  }, [vapi]);
+    const lines = messages.map(
+      (m) => `${m.type === "assistant" ? "Interviewer" : "You"}: ${m.content}`
+    );
+    const blob = new Blob(
+      [`Mentlio AI Interview Prep — transcript\n${new Date().toLocaleString()}\n\n${lines.join("\n\n")}\n`],
+      { type: "text/plain;charset=utf-8" }
+    );
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `mentlio-interview-transcript-${Date.now()}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    toast.success("Transcript downloaded.");
+  };
 
   const handleEnd = () => {
     stopCamera();
-    vapi.stop();
+    micStreamRef.current?.getTracks().forEach((track) => track.stop());
+    micStreamRef.current = null;
+    try {
+      vapi.stop();
+    } catch (error) {
+      console.error("Error stopping the call:", error);
+    }
     setIsMicOn(false);
     toast.success("Call ended");
+    // Vapi does not always emit call-end when the session never fully started,
+    // so drive the end-of-interview flow from here as well.
+    setCallFinished(true);
   };
 
-  console.log("🎯 Current Job: start-----------", interviewData.jobTitle);
-  console.log("🧠 Questions: start-------------", interviewData.questions);
-
-  // optional: cleanup on unmount
   useEffect(() => {
-    return () => stopCamera();
+    return () => {
+      (videoRef.current?.srcObject as MediaStream | null)
+        ?.getTracks()
+        .forEach((track) => track.stop());
+      micStreamRef.current?.getTracks().forEach((track) => track.stop());
+      micStreamRef.current = null;
+    };
   }, []);
 
   // -------------------TIMER-----------------------------------
@@ -351,102 +436,6 @@ Key Guidelines:
     const secs = (totalSeconds % 60).toString().padStart(2, "0");
     return `${hrs}:${mins}:${secs}`;
   };
-  // ------------------------TESTING--------------------------
-
-  const demoConversation: Message[] = [
-    { type: "assistant", content: "Hi, Renit. How are you?" },
-    {
-      type: "assistant",
-      content: "Ready for your interview on React and Next.js vs Vue?",
-    },
-    { type: "assistant", content: "Able to work with MongoDB, PostgreSQL..." },
-    {
-      type: "user",
-      content: "Uh, yes. I'm ready for that. I'm pretty excited.",
-    },
-    {
-      type: "assistant",
-      content:
-        "Awesome. Let's kick things off, tell me among React, Next.js, Vue.js",
-    },
-    { type: "assistant", content: "Which one will you use and why?" },
-    {
-      type: "user",
-      content: "Well, I will use Next.js for sure, because of its SSR and SSG",
-    },
-    { type: "assistant", content: "Thats great renit" },
-    {
-      type: "assistant",
-      content: "Now tell me about your experience with react",
-    },
-    {
-      type: "user",
-      content:
-        "I have worked with React for 2 years, where i learned lazy loading, hooks, context api",
-    },
-    {
-      type: "assistant",
-      content: "okay so tell me with your backend experience",
-    },
-    {
-      type: "user",
-      content: "Yes i worked with node , express , flask and even supabase.",
-    },
-    {
-      type: "assistant",
-      content: "Great, tell me something bout your projects?",
-    },
-    {
-      type: "assistant",
-      content:
-        "Tell me any third party packages you have worked with in your project",
-    },
-    {
-      type: "user",
-      content:
-        "yes, i created a neuratwin web app,  that uses openai api to generate text, langchain , mongodb , vapi ai for voice assistants, and sync with googpe calenders.",
-    },
-  ];
-
-  const testing = async () => {
-    setIsDialogOpen(true);
-    setFeedbackLoading(true);
-    toast.success("Interview Has been Ended", {
-      description: (
-        <span className="text-sm text-gray-500 font-medium">
-          Your Interview Has Been Ended!{" "}
-        </span>
-      ),
-    });
-    try {
-      const response = await axios.post("/api/feedback", {
-        conversation: demoConversation,
-      });
-      const feedbackData = response.data?.data;
-      console.log("🧠 Feedback Response:", feedbackData);
-
-      const { data, error } = await supabase.from("others").insert([
-        {
-          userId: user?.id,
-          jobTitle: interviewData?.jobTitle,
-          interviewInsights: feedbackData,
-        },
-      ]);
-
-      toast.success("Feedback generated successfully!");
-
-      if (error) {
-        console.error("❌ Supabase Insert Error:", error);
-        toast.error("Failed to save feedback to database!");
-        toast.success("Feedback generated successfully!");
-      }
-    } catch (error: any) {
-      console.error("❌ Feedback Error:", error);
-      toast.error("Failed to generate feedback. Try again!");
-    } finally {
-      setFeedbackLoading(false);
-    }
-  };
 
   return (
     <div className="w-full h-screen overflow-hidden  bg-white p-4">
@@ -454,9 +443,14 @@ Key Guidelines:
         <div>
           <div className="flex gap-3">
             <SidebarTrigger />
-            <p className=" font-inter flex items-center gap-3 px-4">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => router.back()}
+              className="flex items-center gap-1 px-2 font-inter text-base text-black hover:bg-transparent"
+            >
               <LuChevronLeft className="w-4 h-4" /> Back
-            </p>
+            </Button>
           </div>
           <h1 className="text-[27px] font-sora font-semibold mt-2 flex items-center gap-4">
             AI Interview Prep <LuVideo className="w-6 h-6" />
@@ -482,6 +476,13 @@ Key Guidelines:
                 <div className="w-5 h-5 bg-red-400 rounded-full animate-bounce"></div>
                 <p className="font-inter text-base tracking-wide">
                   Connecting...
+                </p>
+              </div>
+            ) : blockedReason ? (
+              <div className="flex gap-4">
+                <div className="w-5 h-5 bg-gray-400 rounded-full"></div>
+                <p className="font-inter text-base tracking-wide">
+                  Not connected
                 </p>
               </div>
             ) : (
@@ -520,7 +521,7 @@ Key Guidelines:
               <div className="  bg-white border rounded-full w-16 h-16 flex items-center justify-center shrink-0 -mb-5">
                 <h1 className="font-extrabold font-inter text-2xl">AI</h1>
               </div>
-              {!loading && (
+              {!loading && !blockedReason && (
                 <div className="mt-10 flex flex-col space-y-1">
                   <AI_Voice />
                   {activeUser ? (
@@ -531,8 +532,25 @@ Key Guidelines:
                 </div>
               )}
             </div>
+
+            {blockedReason && (
+              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 bg-white/95 px-8 text-center">
+                <LuVideoOff className="w-8 h-8 text-gray-400" />
+                <p className="max-w-md font-inter text-sm text-gray-700">
+                  {blockedReason}
+                </p>
+                <Button
+                  onClick={() => router.push("/home/interview-prep")}
+                  className="font-inter text-sm bg-blue-500 text-white hover:bg-blue-700 cursor-pointer"
+                >
+                  <LuChevronLeft className="w-4 h-4 mr-2" />
+                  Back to Interview Prep
+                </Button>
+              </div>
+            )}
           </div>
 
+          {!blockedReason && (
           <div className="mt-7 flex justify-center gap-10">
             {/*  Video Button */}
             <Button
@@ -569,12 +587,8 @@ Key Guidelines:
               <X className="w-4 h-4 mr-2" />
               End
             </Button>
-
-            {/* TESTING BUTTON */}
-            {/* <Button className="text-sm font-inter" onClick={testing}>
-              Test
-            </Button> */}
           </div>
+          )}
         </div>
         {/* RIGHT */}
         <div className="w-[28%] bg-gray-50 rounded-lg border p-3 flex flex-col">
@@ -621,8 +635,11 @@ Key Guidelines:
 
           <div className="w-full mt-auto">
             <Separator className="my-2" />
-            <Button className="font-inter text-sm w-full bg-white text-black hover:bg-gray-100 cursor-pointer">
-              Download Transcribe <LuDownload className="w-4 h-4" />
+            <Button
+              onClick={downloadTranscript}
+              className="font-inter text-sm w-full bg-white text-black hover:bg-gray-100 cursor-pointer"
+            >
+              Download Transcript <LuDownload className="w-4 h-4" />
             </Button>
           </div>
         </div>
@@ -635,8 +652,8 @@ Key Guidelines:
             <LuActivity className="inline w-5 h-5 ml-2" />
           </h1>
           <p className=" mt-3 font-inter text-center text-muted-foreground">
-            Kindly wait , insights are being generated for you. Then you can
-            sefely leave this board.
+            Kindly wait, insights are being generated for you. Then you can
+            safely leave this page.
           </p>
 
           {feedbackloading ? (

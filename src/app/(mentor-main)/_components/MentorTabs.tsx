@@ -219,7 +219,7 @@ export default function MentorSessionsTabs() {
                 </div>
 
                 <p className="text-sm font-inter tracking-tight">
-                  {session.scheduled_at
+                  {session.requested_at
                     ? new Date(session.requested_at).toLocaleDateString()
                     : "Date of requested"}
                 </p>
@@ -235,9 +235,13 @@ export default function MentorSessionsTabs() {
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <p className="font-inter tracking-tight cursor-pointer text-sm text-muted-foreground flex items-center gap-1">
+                      <button
+                        type="button"
+                        aria-label="View session note"
+                        className="font-inter tracking-tight cursor-pointer text-sm text-muted-foreground flex items-center gap-1"
+                      >
                         View Note <LuEye className="inline" />
-                      </p>
+                      </button>
                     </TooltipTrigger>
                     <TooltipContent side="top" className="max-w-xs">
                       {session.notes || "No note available"}
@@ -246,18 +250,23 @@ export default function MentorSessionsTabs() {
                 </TooltipProvider>
                 {/* ACTIONS- ACCEPT/REJECT */}
                 <div className="flex gap-5">
-                  <div
-                    className="bg-blue-500 w-8 h-8 rounded-full flex items-center justify-center cursor-pointer"
+                  <Button
+                    type="button"
+                    aria-label="Accept session request"
                     onClick={() => handleAccept(session?.id)}
+                    className="bg-blue-500 hover:bg-blue-600 text-white rounded-full h-8 w-8 min-w-0 p-0"
                   >
-                    <Check className="cursor-pointer text-white" />
-                  </div>
-                  <div
-                    className="bg-red-500 w-8 h-8 rounded-full flex items-center justify-center cursor-pointer"
+                    <Check className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    aria-label="Reject session request"
                     onClick={() => handleReject(session?.id)}
+                    className="bg-red-500 hover:bg-red-600 text-white rounded-full h-8 w-8 min-w-0 p-0"
                   >
-                    <X className="cursor-pointer text-white" />
-                  </div>
+                    <X className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
             ))}

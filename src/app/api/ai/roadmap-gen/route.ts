@@ -1,9 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { z } from "zod";
 import { StructuredOutputParser } from "@langchain/core/output_parsers";
-import { ChatGroq } from "@langchain/groq";
 import { NextResponse } from "next/server";
+import { getServerSession } from "@/lib/auth/session";
 import { jsonrepair } from "jsonrepair";
+import { groqComplete, llmErrorResponse } from "@/lib/ai/groq";
 
 // schema non-strict
 const RoadmapSchema = z.object({
@@ -46,20 +47,17 @@ const parser = StructuredOutputParser.fromZodSchema(RoadmapSchema as any);
 
 export async function POST(req: Request) {
   try {
+    const session = await getServerSession();
+    if (!session) {
+      return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+    }
     const apiKey = process.env.GROQ_API_KEY;
     if (!apiKey) {
       return NextResponse.json(
-        { error: "GROQ_API_KEY is not configured" },
-        { status: 500 }
+        { error: "The language model is not configured on this server.", code: "LLM_UNCONFIGURED" },
+        { status: 503 }
       );
     }
-
-    const model = new ChatGroq({
-      apiKey,
-      model: "qwen/qwen3.8-27b",
-      temperature: 0.3,
-      maxTokens: 1000,
-    });
 
     const body = await req.json();
     const field = body.field || "Software Developer";
@@ -104,12 +102,17 @@ Additional Rules:
 ${formatInstructions}
 `;
 
-    const firstResponse = await model.invoke(firstPrompt);
+    const firstText = await groqComplete({
+      prompt: firstPrompt,
+      model: "qwen/qwen3.8-27b",
+      temperature: 0.3,
+      maxTokens: 1000,
+    });
     let repairedJSON: string;
     try {
-      repairedJSON = jsonrepair(firstResponse.content as string);
+      repairedJSON = jsonrepair(firstText);
     } catch {
-      repairedJSON = firstResponse.content as string;
+      repairedJSON = firstText;
     }
 
     let finalParsed: any;
@@ -126,8 +129,7 @@ ${formatInstructions}
     }
 
     return NextResponse.json(finalParsed);
-  } catch (error: any) {
-    console.error("Roadmap generation error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    return llmErrorResponse(error);
   }
 }

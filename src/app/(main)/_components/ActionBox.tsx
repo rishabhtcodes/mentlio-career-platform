@@ -63,7 +63,7 @@ export default function ActionBox() {
             <div>
               <p className="mt-3 text-sm font-sora text-center">
                 {" "}
-                Chart your journey with a clear, personalized path..
+                Chart your journey with a clear, personalized path.
               </p>
             </div>
           </div>

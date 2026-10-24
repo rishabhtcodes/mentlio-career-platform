@@ -22,9 +22,8 @@ import { useUserData } from "@/context/UserDataProvider";
 import { LuChevronLeft, LuLoader } from "react-icons/lu";
 import { Calendar1, Loader2 } from "lucide-react";
 
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { google } from "googleapis";
 
 const localizer = momentLocalizer(moment);
 // const DnDCalendar = withDragAndDrop(Calendar);
@@ -66,8 +65,42 @@ export default function MyCalendar() {
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
   const supabase = createClient();
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [createLoading, setCreateLoading] = useState(false);
+  const [connecting, setConnecting] = useState(false);
+
+  async function connectGoogleCalendar() {
+    if (!user?.id) return;
+    if (user.google_refresh_token) {
+      toast.success("Google Calendar is already connected.");
+      return;
+    }
+    setConnecting(true);
+    try {
+      const connectUrl = `/api/google/connect?user_id=${encodeURIComponent(String(user.id))}`;
+      const res = await fetch(connectUrl, { redirect: "manual" });
+
+      // The server only redirects once Google OAuth is configured; let the
+      // browser follow that redirect so the user lands on Google's consent page.
+      if (res.type === "opaqueredirect") {
+        window.location.href = connectUrl;
+        return;
+      }
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        toast.error(data?.error || "Could not start Google Calendar setup.");
+        return;
+      }
+
+      toast.error("Could not start Google Calendar setup.");
+    } catch {
+      toast.error("Could not reach the Google Calendar service. Try again.");
+    } finally {
+      setConnecting(false);
+    }
+  }
 
   useEffect(() => {
     setLoading(true);
@@ -129,22 +162,52 @@ export default function MyCalendar() {
 
   // ==============================================
 
+  const syncGoogleCalendar = async (
+    type: "create" | "update" | "delete",
+    event: Record<string, any>
+  ) => {
+    const res = await fetch("/api/google/sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type, event }),
+    });
+    const data = await res.json().catch(() => ({}));
+    return {
+      ok: res.ok,
+      error: data?.error as string | undefined,
+      google_event_id: data?.google_event_id as string | undefined,
+    };
+  };
+
   const handleSave = async () => {
+    if (!title.trim()) {
+      toast.error("Please give the event a title.");
+      return;
+    }
+    if (!startDate || !endDate) {
+      toast.error("Please choose a start and end time.");
+      return;
+    }
+
+    const refreshToken = await getRefreshToken();
+
     if (selectedEvent) {
       // -------------------------
       // EDIT MODE
       // -------------------------
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from("userCalendar")
         .update({
           title,
           start_time: startDate,
           end_time: endDate,
         })
-        .eq("id", selectedEvent.id)
-        .select();
+        .eq("id", selectedEvent.id);
 
-      if (!error && data) {
+      if (error) {
+        console.error("Event update failed:", error);
+        toast.error("Your event could not be updated. Please try again.");
+      } else {
         setEvents((prev) =>
           prev.map((ev) =>
             ev.id === selectedEvent.id
@@ -152,97 +215,122 @@ export default function MyCalendar() {
               : ev
           )
         );
-      }
+        toast.success("Event updated.");
 
-      // 🔵 SYNC TO GOOGLE CALENDAR (server route)
-      await fetch("/api/google/sync", {
-        method: "POST",
-        body: JSON.stringify({
-          userId: user?.id,
-          type: "update",
-          event: {
+        if (refreshToken && selectedEvent.google_event_id) {
+          const sync = await syncGoogleCalendar("update", {
             google_event_id: selectedEvent.google_event_id,
             title,
-            start: startDate?.toISOString(),
-            end: endDate?.toISOString(),
-          },
-        }),
-      });
-    } else if (title && startDate && endDate) {
-      // -------------------------
-      // CREATE MODE
-      // -------------------------
-
-      setCreateLoading(true);
-
-      const { data, error } = await supabase
-        .from("userCalendar")
-        .insert([
-          {
-            user_id: user?.id,
-            title,
-            start_time: startDate,
-            end_time: endDate,
-          },
-        ])
-        .select();
-
-      if (!error && data && data[0]) {
-        const created = data[0];
-
-        // 🔵 First insert locally
-        const newEvent: UserCalendarEvent = {
-          ...created,
-          start: new Date(created.start_time),
-          end: new Date(created.end_time),
-          google_event_id: null,
-        };
-
-        setEvents((prev) => [...prev, newEvent]);
-
-        // 🔵 Sync with Google Calendar
-        const res = await fetch("/api/google/sync", {
-          method: "POST",
-          body: JSON.stringify({
-            userId: user?.id,
-            type: "create",
-            event: {
-              title,
-              start: startDate.toISOString(),
-              end: endDate.toISOString(),
-            },
-          }),
-        });
-
-        const { google_event_id } = await res.json();
-
-        if (!google_event_id) {
-          toast.error("Failed to sync with Google Calendar. Please try again.");
-        }
-
-        console.log("GOOGLE EVENT ID", google_event_id);
-
-        // 🔵 Save to Supabase + State (THE FIX)
-        if (google_event_id) {
-          await supabase
-            .from("userCalendar")
-            .update({ google_event_id })
-            .eq("id", created.id);
-
-          // 🔥 Update the local React state
-          setEvents((prev) =>
-            prev.map((ev) =>
-              ev.id === created.id ? { ...ev, google_event_id } : ev
-            )
-          );
+            start: startDate.toISOString(),
+            end: endDate.toISOString(),
+          });
+          if (!sync.ok) {
+            toast.error(sync.error || "Google Calendar sync failed.");
+          }
         }
       }
 
-      setCreateLoading(false);
-      toast.success("Event created successfully in Google Calendar");
+      setIsOpenEvent(false);
+      return;
     }
 
+    // -------------------------
+    // CREATE MODE
+    // -------------------------
+    setCreateLoading(true);
+
+    const { data, error } = await supabase
+      .from("userCalendar")
+      .insert([
+        {
+          user_id: user?.id,
+          title,
+          start_time: startDate,
+          end_time: endDate,
+        },
+      ])
+      .select();
+
+    if (error || !data?.[0]) {
+      console.error("Event create failed:", error);
+      toast.error("Your event could not be created. Please try again.");
+      setCreateLoading(false);
+      setIsOpenEvent(false);
+      return;
+    }
+
+    const created = data[0];
+
+    setEvents((prev) => [
+      ...prev,
+      {
+        ...created,
+        start: new Date(created.start_time),
+        end: new Date(created.end_time),
+        google_event_id: null,
+      } as UserCalendarEvent,
+    ]);
+    setCreateLoading(false);
     setIsOpenEvent(false);
+    toast.success("Event added to your calendar.");
+
+    if (refreshToken) {
+      const sync = await syncGoogleCalendar("create", {
+        title,
+        start: startDate.toISOString(),
+        end: endDate.toISOString(),
+      });
+
+      if (sync.ok && sync.google_event_id) {
+        await supabase
+          .from("userCalendar")
+          .update({ google_event_id: sync.google_event_id })
+          .eq("id", created.id);
+
+        setEvents((prev) =>
+          prev.map((ev) =>
+            ev.id === created.id ? { ...ev, google_event_id: sync.google_event_id } : ev
+          )
+        );
+        toast.success("Event synced to Google Calendar.");
+      } else {
+        toast.error(
+          sync.error || "Saved to your Mentlio calendar, but Google sync failed."
+        );
+      }
+    }
+  };
+
+  const handleDeleteEvent = async () => {
+    if (!selectedEvent) return;
+    const eventId = selectedEvent.id;
+    const googleEventId = selectedEvent.google_event_id;
+
+    const { error } = await supabase
+      .from("userCalendar")
+      .delete()
+      .eq("id", eventId);
+
+    if (error) {
+      console.error("Event delete failed:", error);
+      toast.error("Your event could not be deleted. Please try again.");
+      return;
+    }
+
+    setEvents((prev) => prev.filter((ev) => ev.id !== eventId));
+    toast.success("Event deleted.");
+    setIsOpenEvent(false);
+    setSelectedEvent(null);
+
+    const refreshToken = await getRefreshToken();
+    if (refreshToken && googleEventId) {
+      const sync = await syncGoogleCalendar("delete", {
+        google_event_id: googleEventId,
+      });
+      if (!sync.ok) {
+        toast.error(sync.error || "Google Calendar sync failed.");
+      }
+    }
   };
 
   // ===============================================
@@ -250,7 +338,7 @@ export default function MyCalendar() {
   // ===============================================
 
   const handleEventDrop = async ({ event, start, end }: any) => {
-    await supabase
+    const { error } = await supabase
       .from("userCalendar")
       .update({
         start_time: start,
@@ -258,38 +346,34 @@ export default function MyCalendar() {
       })
       .eq("id", event.id);
 
+    if (error) {
+      console.error("Event move failed:", error);
+      toast.error("Your event could not be moved. Please try again.");
+      return;
+    }
+
     setEvents((prev) =>
       prev.map((ev) => (ev.id === event.id ? { ...ev, start, end } : ev))
     );
 
-    //  If google_event_id is missing, show error
-    if (!event.google_event_id) {
-      toast.error("Google Event ID missing — cannot update Google Calendar");
-      return;
-    }
+    if (!event.google_event_id) return;
 
-    console.log("UPDATE GOOGLE CALENDAR");
-
-    await fetch("/api/google/sync", {
-      method: "POST",
-      body: JSON.stringify({
-        userId: user?.id,
-        type: "update",
-        event: {
-          google_event_id: event.google_event_id,
-          title: event.title,
-          start: start.toISOString(),
-          end: end.toISOString(),
-        },
-      }),
+    const sync = await syncGoogleCalendar("update", {
+      google_event_id: event.google_event_id,
+      title: event.title,
+      start: start.toISOString(),
+      end: end.toISOString(),
     });
+    if (!sync.ok) {
+      toast.error(sync.error || "Google Calendar sync failed.");
+    }
   };
 
   // =====================================================
 
   // ========================================================
   const handleEventResize = async ({ event, start, end }: any) => {
-    await supabase
+    const { error } = await supabase
       .from("userCalendar")
       .update({
         start_time: start,
@@ -297,24 +381,27 @@ export default function MyCalendar() {
       })
       .eq("id", event.id);
 
+    if (error) {
+      console.error("Event resize failed:", error);
+      toast.error("Your event could not be resized. Please try again.");
+      return;
+    }
+
     setEvents((prev) =>
       prev.map((ev) => (ev.id === event.id ? { ...ev, start, end } : ev))
     );
 
-    // sync google
-    await fetch("/api/google/sync", {
-      method: "POST",
-      body: JSON.stringify({
-        userId: user?.id,
-        type: "update",
-        event: {
-          google_event_id: event.google_event_id,
-          title: event.title,
-          start: start.toISOString(),
-          end: end.toISOString(),
-        },
-      }),
+    if (!event.google_event_id) return;
+
+    const sync = await syncGoogleCalendar("update", {
+      google_event_id: event.google_event_id,
+      title: event.title,
+      start: start.toISOString(),
+      end: end.toISOString(),
     });
+    if (!sync.ok) {
+      toast.error(sync.error || "Google Calendar sync failed.");
+    }
   };
 
   if (loading) {
@@ -338,25 +425,34 @@ export default function MyCalendar() {
           <LuChevronLeft className="inline mr-2" /> Back
         </p>
 
-        <Link href={`/api/google/connect?user_id=${user?.id}`}>
-          {user?.google_refresh_token ? (
-            <Button
-              className="font-inter cursor-pointer flex items-center gap-2 bg-green-500 text-white hover:bg-green-600"
-              size="sm"
-            >
-              Connected to Google
-              <Calendar1 className="inline" />
-            </Button>
-          ) : (
-            <Button
-              className="font-inter cursor-pointer flex items-center gap-2 bg-blue-600 text-white hover:bg-blue-700"
-              size="sm"
-            >
-              Connect Google Calendar
-              <Calendar1 className="inline" />
-            </Button>
-          )}
-        </Link>
+        <Button
+          variant="ghost"
+          className="font-inter cursor-pointer pl-0"
+          onClick={() => router.back()}
+        >
+          <LuChevronLeft className="inline mr-2" /> Back
+        </Button>
+
+        {user?.google_refresh_token ? (
+          <Button
+            className="font-inter cursor-pointer flex items-center gap-2 bg-green-500 text-white hover:bg-green-600"
+            size="sm"
+            onClick={connectGoogleCalendar}
+          >
+            Connected to Google
+            <Calendar1 className="inline" />
+          </Button>
+        ) : (
+          <Button
+            className="font-inter cursor-pointer flex items-center gap-2 bg-blue-600 text-white hover:bg-blue-700"
+            size="sm"
+            disabled={connecting}
+            onClick={connectGoogleCalendar}
+          >
+            {connecting ? "Connecting..." : "Connect Google Calendar"}
+            <Calendar1 className="inline" />
+          </Button>
+        )}
       </div>
       <DndCalendar
         selectable
@@ -420,6 +516,16 @@ export default function MyCalendar() {
           </div>
 
           <DialogFooter>
+            {selectedEvent && (
+              <Button
+                onClick={handleDeleteEvent}
+                variant="destructive"
+                className="font-inter mr-auto"
+                disabled={createLoading}
+              >
+                Delete
+              </Button>
+            )}
             <Button onClick={() => setIsOpenEvent(false)} variant="outline">
               Cancel
             </Button>

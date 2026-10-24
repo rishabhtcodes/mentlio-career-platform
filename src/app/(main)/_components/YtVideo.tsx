@@ -2,8 +2,6 @@
 import { useEffect, useState } from "react";
 import { useQuizData } from "@/context/userQuizProvider";
 
-const API_KEY = process.env.NEXT_PUBLIC_YOUTUBE_API_KEY;
-
 const YtVideo = () => {
   const { quizData } = useQuizData();
   const [videos, setVideos] = useState<any[]>([]);
@@ -17,28 +15,14 @@ const YtVideo = () => {
       try {
         const searchQuery = encodeURIComponent(quizData.selectedCareer);
 
-        // STEP 1: Get up to 30 video IDs
+        // Server-side proxy: keeps the YouTube API key out of the browser bundle.
         const searchRes = await fetch(
-          `https://www.googleapis.com/youtube/v3/search?part=id&maxResults=30&q=${searchQuery}&type=video&order=viewCount&key=${API_KEY}`
+          `/api/youtube/search?q=${searchQuery}&maxResults=30&order=viewCount&details=true`
         );
         const searchData = await searchRes.json();
+        if (!searchRes.ok) throw new Error(searchData?.error || "YouTube search failed");
 
-        const videoIds = searchData.items
-          .map((v: any) => v.id?.videoId)
-          .filter(Boolean)
-          .join(",");
-
-        if (!videoIds) {
-          setVideos([]);
-          setLoading(false);
-          return;
-        }
-
-        // STEP 2: Get detailed video data
-        const detailsRes = await fetch(
-          `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails,statistics&id=${videoIds}&key=${API_KEY}`
-        );
-        const detailsData = await detailsRes.json();
+        const detailsData = { items: searchData.items || [] };
 
         // STEP 3: Filter valid videos
         const filtered = (detailsData.items || [])

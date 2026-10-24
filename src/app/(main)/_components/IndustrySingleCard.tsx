@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { ChevronRight, LucideArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
-import { Chevron } from "react-day-picker";
 
 const cards = [
   {
@@ -14,18 +13,20 @@ const cards = [
       "Jobs, courses, colleges, and much more to help you prepare for your career.",
     gradient: "from-blue-200 to-blue-600",
     image: "/element8.png",
+    actionLabel: "Learn More",
   },
   {
     id: 2,
     title: "Know Your Career Fit",
     description:
-      "Personalized AI assestment to help you determine whether you're ready for your career.",
+      "Personalized AI assessment to help you determine whether you're ready for your career.",
     gradient: "from-yellow-100 to-amber-500",
     image: "/sec6.png",
+    actionLabel: "Check Out",
   },
 ];
 
-const SingleCard = () => {
+const SingleCard = ({ onAction }: { onAction: (cardId: number) => void }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
 
   // Auto-slide every 4 seconds
@@ -63,15 +64,19 @@ const SingleCard = () => {
                 </p>
 
                 <div className="flex items-center gap-8">
-                  {card?.id === 1 ? (
-                    <Button className="cursor-pointer" variant="outline">
-                      Learn More <LucideArrowRight size={18} />
-                    </Button>
-                  ) : (
-                    <Button className="cursor-pointer font-inter" variant="outline">
-                      Check Out <ChevronRight size={18} />
-                    </Button>
-                  )}
+                  <Button
+                    className="cursor-pointer font-inter"
+                    variant="outline"
+                    aria-label={`${card.actionLabel}: ${card.title}`}
+                    onClick={() => onAction(card.id)}
+                  >
+                    {card.actionLabel}
+                    {card.id === 1 ? (
+                      <LucideArrowRight size={18} />
+                    ) : (
+                      <ChevronRight size={18} />
+                    )}
+                  </Button>
                 </div>
               </div>
             </div>

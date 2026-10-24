@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 import { useUserData } from "@/context/UserDataProvider";
 import { useRouter } from "next/navigation";
@@ -27,6 +26,7 @@ import {
   Divide,
   Loader2,
   LucideActivity,
+  LucideCheck,
   LucideGlobe,
   LucideHistory,
   LucideSendHorizontal,
@@ -36,9 +36,9 @@ import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { UserQuizData } from "@/lib/types/allTypes";
-import { getUserQuizData } from "@/lib/functions/dbActions";
+import { getUserQuizData, setSelectedCareer } from "@/lib/functions/dbActions";
+import { useQuizData } from "@/context/userQuizProvider";
 import { Skeleton } from "@/components/ui/skeleton";
-import { runAgent } from "@/lib/functions/Agents";
 import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import ReactMarkdown from "react-markdown";
@@ -54,12 +54,56 @@ type Message = {
 const CareerCoach = () => {
   const router = useRouter();
   const { user, loading } = useUserData();
+  const { quizData: savedQuizData, refreshQuizData } = useQuizData();
   const supabase = createClient();
   const focus = user?.mainFocus?.toLowerCase();
   const [careerSkillOptions, setCareerSkillOptions] = useState<string[]>([]);
   const [quizData, setQuizData] = useState<UserQuizData[] | null>(null); // data will always be in this format(as table structure , only the quizInfo differs so we have any for that)
   const [quizDataLoading, setQuizDataLoading] = useState(false);
   const [showSuggestion, setShowSuggestion] = useState(false);
+  const [showCareerDialog, setShowCareerDialog] = useState(false);
+  const [savingCareer, setSavingCareer] = useState("");
+
+  const handleSelectCareer = async (career: string) => {
+    if (!user?.id || savingCareer) return;
+    if (savedQuizData?.selectedCareer === career) return;
+
+    setSavingCareer(career);
+    const saved = await setSelectedCareer(user.id, career);
+    setSavingCareer("");
+
+    if (!saved) {
+      toast.error("Could not save your career choice. Please try again.");
+      return;
+    }
+
+    await refreshQuizData();
+    toast.success(`${career} is now your selected career.`);
+  };
+
+  const careerOptionButton = (option: string, key: React.Key) => {
+    const isSelected = savedQuizData?.selectedCareer === option;
+    const isSaving = savingCareer === option;
+    return (
+      <button
+        type="button"
+        key={key}
+        disabled={!!savingCareer || isSelected}
+        onClick={() => handleSelectCareer(option)}
+        aria-pressed={isSelected}
+        className={`h-11 flex items-center justify-center gap-1 rounded-md shadow p-1 border transition text-center ${
+          isSelected
+            ? "bg-blue-50 border-blue-400 text-blue-700"
+            : "bg-white text-black hover:shadow-md hover:bg-slate-100"
+        }`}
+      >
+        <span className="text-xs font-inter font-light tracking-tight line-clamp-2">
+          {isSaving ? "Saving…" : option}
+        </span>
+        {isSelected && <LucideCheck className="w-4 h-4 shrink-0" />}
+      </button>
+    );
+  };
 
   const [quizSummary, setQuizSummary] = useState<string>("");
   const [quizStream, setQuizStream] = useState<string>("");
@@ -251,7 +295,12 @@ const CareerCoach = () => {
               )}
               {showSuggestion && user?.isQuizDone ? (
                 // Career suggestions
-                <div className="mt-5 grid grid-cols-3 gap-6 px-6">
+                <div className="mt-5 px-6">
+                  <p className="mb-3 font-inter text-sm text-gray-700">
+                    Click a career to set it as yours. Your career board, jobs,
+                    courses, and mentor matches use this choice.
+                  </p>
+                  <div className="grid grid-cols-3 gap-6">
                   {quizDataLoading
                     ? Array.from({ length: 5 }).map((_, idx) => (
                         <Skeleton
@@ -259,18 +308,10 @@ const CareerCoach = () => {
                           className="h-12 w-full rounded-xl"
                         />
                       ))
-                    : careerSkillOptions.map((option, idx) => (
-                        <div
-                          key={idx}
-                          className="h-11 flex items-center justify-center rounded-md shadow p-1 
-              bg-white text-black border hover:shadow-md hover:bg-slate-100 
-              transition text-center"
-                        >
-                          <p className="text-xs font-inter font-light tracking-tight line-clamp-2">
-                            {option}
-                          </p>
-                        </div>
-                      ))}
+                    : careerSkillOptions.map((option, idx) =>
+                        careerOptionButton(option, idx)
+                      )}
+                  </div>
                 </div>
               ) : (
                 <div className="mt-8 grid grid-cols-3 gap-6 px-6">
@@ -422,7 +463,11 @@ const CareerCoach = () => {
                   </Button>
                 )}
 
-                <p className="text-gray-600 font-sora text-sm">5 searchs -</p>
+                <p className="text-gray-600 font-sora text-sm">
+                  {savedQuizData?.selectedCareer
+                    ? `Career: ${savedQuizData.selectedCareer}`
+                    : "No career selected yet"}
+                </p>
               </div>
               <div className="relative">
                 <Textarea
@@ -479,7 +524,10 @@ const CareerCoach = () => {
               </p>
 
               <div className="w-full flex items-center justify-center mt-5">
-                <Button className="cursor-pointer bg-white text-black hover:bg-gray-100 ">
+                <Button
+                  className="cursor-pointer bg-white text-black hover:bg-gray-100 "
+                  onClick={() => router.push("/home/interview-prep")}
+                >
                   Talk Now <LuMic className="ml-2" />
                 </Button>
               </div>
@@ -504,7 +552,18 @@ const CareerCoach = () => {
               Get to know how much your career is fit for you with help of AI
             </p>
 
-            <Button variant="outline" size="sm" className="font-inter mt-5">
+            <Button
+              variant="outline"
+              size="sm"
+              className="font-inter mt-5"
+              onClick={() => {
+                if (!user?.isQuizDone) {
+                  router.push("/start-quiz");
+                  return;
+                }
+                setShowCareerDialog(true);
+              }}
+            >
               Find Now <LuChevronRight className="ml-2" />
             </Button>
             <Image
@@ -535,6 +594,39 @@ const CareerCoach = () => {
               }}
             >
               Start Quiz
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={showCareerDialog} onOpenChange={setShowCareerDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Choose your career</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            These careers come from your AI assessment. Pick the one you want to
+            pursue — your career board, jobs, courses, and mentor matches use it.
+          </p>
+          {savedQuizData?.selectedCareer && (
+            <p className="text-sm font-inter text-blue-700">
+              Current choice: {savedQuizData.selectedCareer}
+            </p>
+          )}
+          {careerSkillOptions.length > 0 ? (
+            <div className="grid grid-cols-2 gap-3 py-2">
+              {careerSkillOptions.map((option, idx) =>
+                careerOptionButton(option, idx)
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              No career suggestions yet. Finish the quiz to get personalized
+              options.
+            </p>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCareerDialog(false)}>
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>

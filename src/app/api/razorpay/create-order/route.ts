@@ -132,8 +132,20 @@ export async function POST(req: NextRequest) {
 
       const order = await razorpay.orders.create(options);
       orderId = order.id;
+    } else if (process.env.NODE_ENV === "production" || process.env.VERCEL) {
+      // Never run the test simulator in production: its verification path would
+      // let anyone grant themselves credits/Pro without paying.
+      return NextResponse.json(
+        {
+          error:
+            "Razorpay is not configured on this environment. Missing NEXT_PUBLIC_RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET.",
+          code: "PAYMENT_PROVIDER_UNCONFIGURED",
+        },
+        { status: 503 }
+      );
     } else {
       // High-fidelity Test Simulator Order (Cryptographically tied and verified)
+      // Local/development only.
       isSimulated = true;
       orderId = `order_test_${crypto.randomBytes(8).toString("hex")}`;
     }

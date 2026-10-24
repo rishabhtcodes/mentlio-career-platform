@@ -55,3 +55,6 @@ MENTLIO_PRODUCTION_AUDIT.md
 MENTLIO_LLM_AUDIT.md
 scripts/sync-vercel-env.cjs
 
+
+# local database (contains credential hashes - never commit)
+data/mentlio.json

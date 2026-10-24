@@ -177,3 +177,32 @@ html, body {
 }
 
 }
+/* Resume export: print() only the A4 page, everything else hidden */
+@media print {
+  html,
+  body {
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff;
+  }
+  body * {
+    visibility: hidden;
+  }
+  #resume-print-area,
+  #resume-print-area * {
+    visibility: visible;
+  }
+  #resume-print-area {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 794px;
+    transform: none !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+  }
+  @page {
+    size: A4;
+    margin: 0;
+  }
+}

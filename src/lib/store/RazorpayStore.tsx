@@ -70,14 +70,8 @@ export const useRazorpayStore = create<RazorpayStore>((set, get) => ({
       const orderId = orderData.orderId;
 
       // Handle payment completion
-      const handleVerification = async (paymentResult: RazorpayResponse) => {
+      const applyEntitlementResult = async (verifyRes: Response) => {
         try {
-          const verifyRes = await fetch("/api/razorpay/verify-payment", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(paymentResult),
-          });
-
           const verifyData = await verifyRes.json();
 
           if (verifyData.success) {
@@ -97,6 +91,16 @@ export const useRazorpayStore = create<RazorpayStore>((set, get) => ({
         } finally {
           set({ loading: false });
         }
+      };
+
+      const handleVerification = async (paymentResult: RazorpayResponse) => {
+        await applyEntitlementResult(
+          await fetch("/api/razorpay/verify-payment", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(paymentResult),
+          })
+        );
       };
 
       // 2. Check if official Razorpay checkout script is loaded and real key is present
@@ -130,22 +134,25 @@ export const useRazorpayStore = create<RazorpayStore>((set, get) => ({
 
         const rzp = new (window as any).Razorpay(options);
         rzp.open();
-      } else {
-        // High-Fidelity Test Mode / Verification Simulator
-        // Accurately tests the verified backend order-payment-credit lifecycle without requiring live merchant bank linkage
-        console.log("ℹ️ Executing verified Test Mode payment simulation for order:", orderId);
-        
+      } else if (orderData.isSimulated) {
+        // Development-only payment simulator: the server finalizes the order it
+        // created, so no signature is ever forged in the browser.
+        console.log("ℹ️ Executing development Test Mode payment simulation for order:", orderId);
+
         // Emulate realistic payment delay
         await new Promise((resolve) => setTimeout(resolve, 600));
 
-        const simulatedPaymentId = `pay_test_${Date.now()}`;
-        const simulatedSignature = `sig_valid_${orderId}`;
-
-        await handleVerification({
-          razorpay_order_id: orderId,
-          razorpay_payment_id: simulatedPaymentId,
-          razorpay_signature: simulatedSignature,
-        });
+        await applyEntitlementResult(
+          await fetch("/api/razorpay/simulate-payment", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ orderId }),
+          })
+        );
+      } else {
+        const msg = "❌ Payment failed: Razorpay checkout could not be loaded. Please try again.";
+        set({ message: msg, loading: false });
+        toast.error(msg);
       }
     } catch (error: any) {
       console.error("Payment error:", error);

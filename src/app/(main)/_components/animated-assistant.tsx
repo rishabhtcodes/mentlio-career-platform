@@ -17,17 +17,65 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { LuSend } from "react-icons/lu";
+import { useUserData } from "@/context/UserDataProvider";
+import { useQuizData } from "@/context/userQuizProvider";
+
+type AssistantMessage = { role: "user" | "ai"; text: string };
 
 export default function AnimatedAssistant() {
   const [showWave, setShowWave] = useState(false);
   const [displayText, setDisplayText] = useState("AI Assistant");
   const { isOpen, open, close } = useAssistantSheetStore();
+  const { user } = useUserData();
+  const { quizData } = useQuizData();
+  const [input, setInput] = useState("");
+  const [messages, setMessages] = useState<AssistantMessage[]>([]);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const sendMessage = async () => {
+    const question = input.trim();
+    if (!question || sending) return;
+    setSending(true);
+    setError(null);
+    setMessages((prev) => [...prev, { role: "user", text: question }]);
+    setInput("");
+    try {
+      const res = await fetch("/api/ai/career-coach", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          question,
+          userName: user?.userName,
+          user_current_status: user?.current_status,
+          stream: quizData?.quizInfo?.stream,
+          careerOptions: (quizData?.quizInfo?.careerOptions || []).join(", "),
+          summary: quizData?.quizInfo?.summary,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "The assistant is unavailable right now.");
+      setMessages((prev) => [...prev, { role: "ai", text: String(data.reply ?? "") }]);
+    } catch (err: any) {
+      setError(err?.message || "The assistant is unavailable right now.");
+    } finally {
+      setSending(false);
+    }
+  };
+
 
   const texts = [
     "Do You Need help?",
     "Ask me anything.",
     "AI Assistant",
     "How can I help today?",
+  ];
+
+  const prompts = [
+    "Which career suits my profile best?",
+    "What skills should I learn next?",
+    "How do I build a strong resume?",
+    "How should I prepare for interviews?",
   ];
 
   useEffect(() => {
@@ -111,36 +159,70 @@ export default function AnimatedAssistant() {
             </SheetDescription>
           </SheetHeader>
           <div className="grid grid-cols-2 gap-4 px-2 mt-5">
-              <div className="p-2 rounded-sm bg-blue-200 border-2 cursor-none border-blue-600 text-black font-sora text-xs tracking-tight text-center hover:bg-blue-200 hover:scale-105 transition-all duration-200">
-                <p>Getting started with Mentlio</p>
+            {prompts.map((p) => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => setInput(p)}
+                className="p-2 rounded-sm bg-blue-200 border-2 border-blue-500 text-black font-sora text-xs tracking-tight text-center hover:bg-blue-200 hover:scale-105 transition-all duration-200 cursor-pointer"
+              >
+                <p>{p}</p>
+              </button>
+            ))}
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-2 mt-5 space-y-3">
+            {messages.length === 0 ? (
+              <p className="text-gray-300 text-sm font-inter px-1">
+                Ask a career question and Mentlio Coach will answer it using your quiz profile.
+              </p>
+            ) : (
+              messages.map((m, i) => (
+                <div
+                  key={i}
+                  className={`text-sm font-inter rounded-md p-2 whitespace-pre-wrap ${
+                    m.role === "user"
+                      ? "bg-blue-600 text-white ml-8"
+                      : "bg-slate-800 text-gray-100 mr-8 border border-slate-700"
+                  }`}
+                >
+                  {m.text || (sending ? "Thinking…" : "")}
+                </div>
+              ))
+            )}
+            {sending && messages[messages.length - 1]?.role === "user" && (
+              <div className="text-sm font-inter rounded-md p-2 bg-slate-800 text-gray-300 mr-8 border border-slate-700">
+                Thinking…
               </div>
-              <div className="p-2 rounded-sm bg-blue-200 border-2 border-blue-500 text-black font-sora text-xs tracking-tight text-center hover:bg-blue-200 hover:scale-105 transition-all duration-200">
-                <p>Get To know more about Mentlio</p>
-              </div>
-              <div className="p-2 rounded-sm bg-blue-200 border-2 border-blue-500 text-black font-sora text-xs tracking-tight text-center hover:bg-blue-200 hover:scale-105 transition-all duration-200">
-                <p>Creating Tickets to solve complex quiries</p>
-              </div>
-              <div className="p-2 rounded-sm bg-blue-200 border-2 border-blue-500 text-black font-sora text-xs tracking-tight text-center hover:bg-blue-200 hover:scale-105 transition-all duration-200">
-                <p>Billing or Pricing Details</p>
-              </div>
-            </div>
+            )}
+            {error && (
+              <p className="text-xs font-inter text-red-300 px-1">{error}</p>
+            )}
+          </div>
 
                <SheetFooter className="shrink-0">
-          <div>
+          <div className="w-full">
             <Label className="text-white font-inter text-sm tracking-tight font-medium mt-2 mb-2">
               Send a message
             </Label>
             <div className="relative">
               <Textarea
                 placeholder="Write a message"
-                // value={input}
-                // onChange={(e) => setInput(e.target.value)}
-                // onKeyDown={handleKeyDown}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                  }
+                }}
                 className="bg-black text-gray-200 font-inter text-sm tracking-tight font-medium mt-2 mb-2 h-28 resize-none"
               />
               <Button
-                className="absolute right-2 bottom-2 bg-gray-600"
-                // onClick={sendMessage}
+                className="absolute right-2 bottom-2 bg-gray-600 cursor-pointer"
+                onClick={sendMessage}
+                disabled={sending || !input.trim()}
+                aria-label="Send message"
               >
                 <LuSend className="text-white" size={10} />
               </Button>

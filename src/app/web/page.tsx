@@ -1,5 +1,4 @@
 "use client";
-import { Button } from "@/components/ui/button";
 import NavbarWeb from "@/components/web-content/navbar";
 import { AnimatedShinyText } from "@/components/ui/animated-shiny-text";
 import { LightRays } from "@/components/ui/light-rays";
@@ -9,7 +8,6 @@ import { ArrowRightIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LuChevronRight, LuPlus, LuTrendingUp, LuVideo } from "react-icons/lu";
 import Image from "next/image";
-import { SmoothCursor } from "@/components/ui/smooth-cursor";
 import { Separator } from "@/components/ui/separator";
 
 const Webpage = () => {
@@ -122,7 +120,7 @@ const Webpage = () => {
       </main>
 
       {/* SECTION 2  STATS*/}
-      <section className="my-20 px-4 py-4 w-full max-w-[1350px] mx-auto relative ">
+      <section id="services" className="my-20 px-4 py-4 w-full max-w-[1350px] mx-auto relative ">
         <div className="flex justify-between w-full ">
           <div>
             <h2 className=" text-muted-foreground font-inter text-3xl font-extrabold opacity-40">
@@ -245,7 +243,7 @@ const Webpage = () => {
 
       {/* SECTION 3 FEATURE*/}
 
-      <section className="my-20 px-4 py-4 w-full max-w-[1400px] mx-auto relative min-h-screen">
+      <section id="about" className="my-20 px-4 py-4 w-full max-w-[1400px] mx-auto relative min-h-screen">
         <div className="w-full flex items-center justify-between">
           <div>
             <h2 className=" text-muted-foreground font-inter text-3xl font-extrabold opacity-40">

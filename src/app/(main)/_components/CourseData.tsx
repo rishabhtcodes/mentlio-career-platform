@@ -4,11 +4,10 @@ import { useEffect, useState } from "react";
 import { useQuizData } from "@/context/userQuizProvider";
 import { Button } from "@/components/ui/button";
 import { ExternalLink } from "lucide-react";
-import YtVideo from "../home/test/yt/page";
+import YtVideo from "./YtVideo";
 import { LuLoader } from "react-icons/lu";
 import { Skeleton } from "@/components/ui/skeleton";
 
-const API_KEY = process.env.NEXT_PUBLIC_YOUTUBE_API_KEY;
 
 type Course = {
   title: string;
@@ -92,6 +91,7 @@ const demoCourses: Course[] = [
 export default function CareerCourses() {
   const { quizData } = useQuizData();
   const [courses, setCourses] = useState<Course[]>([]);
+  const [coursesError, setCoursesError] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -100,11 +100,18 @@ export default function CareerCourses() {
     const fetchCourses = async () => {
       try {
         setLoading(true);
+        setCoursesError("");
         const res = await fetch(`/api/courses?q=${quizData.selectedCareer}`);
-        const data: Course[] = await res.json();
-        setCourses(data || []);
-      } catch (err) {
+        const data = await res.json().catch(() => null);
+        if (!res.ok) {
+          throw new Error(
+            (data as any)?.error || "Course search is unavailable right now."
+          );
+        }
+        setCourses(Array.isArray(data) ? data : []);
+      } catch (err: any) {
         console.error("❌ Error fetching courses:", err);
+        setCoursesError(err?.message || "Could not load courses right now.");
       } finally {
         setLoading(false);
       }
@@ -127,6 +134,7 @@ export default function CareerCourses() {
   // YT VIDEOS
 
   const [videos, setVideos] = useState<any[]>([]);
+  const [videosError, setVideosError] = useState("");
   const [loadingV, setLoadingV] = useState(false);
 
   useEffect(() => {
@@ -134,31 +142,18 @@ export default function CareerCourses() {
 
     const fetchVideos = async () => {
       setLoading(true);
+      setVideosError("");
       try {
         const searchQuery = encodeURIComponent(quizData.selectedCareer);
 
-        // STEP 1: Get up to 30 video IDs
+        // Server-side proxy: keeps the YouTube API key out of the browser bundle.
         const searchRes = await fetch(
-          `https://www.googleapis.com/youtube/v3/search?part=id&maxResults=30&q=${searchQuery}&type=video&order=viewCount&key=${API_KEY}`
+          `/api/youtube/search?q=${searchQuery}&maxResults=30&order=viewCount&details=true`
         );
         const searchData = await searchRes.json();
+        if (!searchRes.ok) throw new Error(searchData?.error || "YouTube search failed");
 
-        const videoIds = searchData.items
-          .map((v: any) => v.id?.videoId)
-          .filter(Boolean)
-          .join(",");
-
-        if (!videoIds) {
-          setVideos([]);
-          setLoadingV(false);
-          return;
-        }
-
-        // STEP 2: Get detailed video data
-        const detailsRes = await fetch(
-          `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails,statistics&id=${videoIds}&key=${API_KEY}`
-        );
-        const detailsData = await detailsRes.json();
+        const detailsData = { items: searchData.items || [] };
 
         // STEP 3: Filter valid videos
         const filtered = (detailsData.items || [])
@@ -183,8 +178,11 @@ export default function CareerCourses() {
           .slice(0, 10); //top 10
 
         setVideos(filtered);
-      } catch (err) {
+      } catch (err: any) {
         console.error("Error fetching YouTube videos:", err);
+        setVideosError(
+          err?.message || "Could not load YouTube videos right now."
+        );
       } finally {
         setLoadingV(false);
       }
@@ -237,8 +235,6 @@ export default function CareerCourses() {
         </div>
       </>
     );
-  if (!courses.length)
-    return <p className="text-center mt-6">No courses found.</p>;
 
   return (
     <div className="max-w-[1300px] mx-auto  px-4">
@@ -273,6 +269,15 @@ export default function CareerCourses() {
         className="transition-all duration-300 ease-in-out animate-fadeIn"
       >
         {activeTab === "courses" ? (
+          coursesError ? (
+            <p className="text-center mt-6 text-muted-foreground">
+              {coursesError}
+            </p>
+          ) : courses.length === 0 ? (
+            <p className="text-center mt-6 text-muted-foreground">
+              No courses found for {quizData?.selectedCareer}.
+            </p>
+          ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10">
             {courses.map((course, idx) => (
               <div
@@ -328,6 +333,7 @@ export default function CareerCourses() {
               </div>
             ))}
           </div>
+          )
         ) : (
           // <YtVideo />
           <div className="">
@@ -336,7 +342,10 @@ export default function CareerCourses() {
             </h2>
 
             {loading && <p className="font-inter text-lg my-4">Loading top videos...</p>}
-            {!loading && videos.length === 0 && (
+            {!loading && videosError && (
+              <p className="text-gray-500">{videosError}</p>
+            )}
+            {!loading && !videosError && videos.length === 0 && (
               <p className="text-gray-500">No videos match the criteria.</p>
             )}
 

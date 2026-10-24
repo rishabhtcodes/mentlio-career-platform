@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
-import { ChatGroq } from "@langchain/groq";
 import { PromptTemplate } from "@langchain/core/prompts";
 import { StructuredOutputParser } from "@langchain/core/output_parsers";
 import { z } from "zod";
+import { getServerSession } from "@/lib/auth/session";
+import { groqComplete, LlmError } from "@/lib/ai/groq";
 
 // --- Zod Schema
 const followUpSchema = z.object({
@@ -26,19 +27,18 @@ Return ONLY JSON in this format, no other text or reponse is allowed:
 // --- Usage ---
 export async function POST(req: Request) {
   try {
-    const apiKey = process.env.GROQ_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json({ followUps: [] });
+    const session = await getServerSession();
+    if (!session) {
+      return NextResponse.json({ error: "Authentication required." }, { status: 401 });
     }
 
-    const llm = new ChatGroq({
-      apiKey,
-      model: "qwen/qwen3.8-27b",
-      temperature: 0.7,
-      maxTokens: 300,
-    });
-
-    const chain = promptTemplate.pipe(llm).pipe(parser);
+    const apiKey = process.env.GROQ_API_KEY;
+    if (!apiKey) {
+      return NextResponse.json(
+        { followUps: [], error: "The language model is not configured on this server.", code: "LLM_UNCONFIGURED" },
+        { status: 503 }
+      );
+    }
 
     const body = await req.json();
     const conversationString: string = body.conversationString;
@@ -47,21 +47,42 @@ export async function POST(req: Request) {
       return NextResponse.json({ followUps: [] }, { status: 400 });
     }
 
-    const input = {
+    const promptText = await promptTemplate.format({
       conversation: conversationString,
       format_instructions: parser.getFormatInstructions(),
-    };
+    });
 
-    // cleaning
-    const result = (await chain.invoke(input)) as { followUps?: string[] };
-    const followUps = Array.isArray(result.followUps)
-      ? result.followUps.slice(0, 4)
+    const rawText = await groqComplete({
+      prompt: promptText,
+      model: "qwen/qwen3.8-27b",
+      temperature: 0.7,
+      maxTokens: 300,
+    });
+
+    let parsed: { followUps?: string[] } = {};
+    try {
+      parsed = (await parser.parse(rawText)) as { followUps?: string[] };
+    } catch {
+      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) parsed = JSON.parse(jsonMatch[0]);
+    }
+    const followUps = Array.isArray(parsed.followUps)
+      ? parsed.followUps.slice(0, 4)
       : [];
 
     return NextResponse.json({ followUps });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  } catch (err: any) {
-    console.error("Follow-up API error:", err);
-    return NextResponse.json({ followUps: [] }, { status: 500 });
+  } catch (error) {
+    // The coach UI reads `followUps`, so keep the key present while still
+    // reporting the failure honestly instead of pretending the call succeeded.
+    const payload: Record<string, unknown> = { followUps: [] };
+    if (error instanceof LlmError) {
+      payload.error = error.message;
+      payload.code = error.code;
+      return NextResponse.json(payload, { status: error.status });
+    }
+    console.error("Follow-up API error:", error);
+    payload.error = "The follow-up generator failed unexpectedly.";
+    payload.code = "LLM_UNEXPECTED";
+    return NextResponse.json(payload, { status: 500 });
   }
 }

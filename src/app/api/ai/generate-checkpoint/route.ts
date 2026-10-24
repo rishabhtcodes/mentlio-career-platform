@@ -1,10 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { NextResponse } from "next/server";
-import { ChatGroq } from "@langchain/groq";
 import { PromptTemplate } from "@langchain/core/prompts";
 import { StructuredOutputParser } from "@langchain/core/output_parsers";
 import { z } from "zod";
+import { getServerSession } from "@/lib/auth/session";
+import { groqComplete, llmErrorResponse } from "@/lib/ai/groq";
 
 // -----------------------------
 // ZOD SCHEMA (NO YOUTUBE)
@@ -58,23 +59,17 @@ Rules:
 // -----------------------------
 export async function POST(request: Request) {
   try {
+    const session = await getServerSession();
+    if (!session) {
+      return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+    }
     const apiKey = process.env.GROQ_API_KEY;
     if (!apiKey) {
       return NextResponse.json(
-        { error: "GROQ_API_KEY is not configured" },
-        { status: 500 }
+        { isError: true, error: "The language model is not configured on this server.", code: "LLM_UNCONFIGURED" },
+        { status: 503 }
       );
     }
-
-    const llm = new ChatGroq({
-      apiKey,
-      model: "qwen/qwen3.8-27b",
-      temperature: 0.6,
-      maxTokens: 1200,
-      maxRetries: 3,
-    });
-
-    const chain = promptTemplate.pipe(llm).pipe(parser);
 
     const body = await request.json();
     const { title, description } = body;
@@ -86,23 +81,30 @@ export async function POST(request: Request) {
       );
     }
 
-    const input = {
+    const promptText = await promptTemplate.format({
       title,
       description,
       format_instructions: parser.getFormatInstructions(),
-    };
+    });
 
-    const result = await chain.invoke(input);
+    const rawText = await groqComplete({
+      prompt: promptText,
+      model: "qwen/qwen3.8-27b",
+      temperature: 0.6,
+      maxTokens: 1200,
+    });
+
+    let result: unknown;
+    try {
+      result = await parser.parse(rawText);
+    } catch {
+      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) throw new Error("The model did not return usable JSON.");
+      result = JSON.parse(jsonMatch[0]);
+    }
 
     return NextResponse.json({ data: result });
-  } catch (error: any) {
-    console.error("❌ AI Generation Error:", error);
-    return NextResponse.json(
-      {
-        isError: true,
-        error: error.message || "Failed to generate checkpoint details",
-      },
-      { status: 500 }
-    );
+  } catch (error) {
+    return llmErrorResponse(error);
   }
 }

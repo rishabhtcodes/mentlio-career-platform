@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useUserData } from "@/context/UserDataProvider"; // contains mentor
 import Image from "next/image";
+import { toast } from "sonner";
 
 type Message = {
   id: string;
@@ -116,17 +117,25 @@ const MentorMessagesId = () => {
   const sendMessage = async () => {
     if (!text.trim() || !mentor?.id || !profileId) return;
 
-    const { error } = await supabase.from("messages").insert({
-      sender_id: mentor.id,
-      receiver_id: profileId,
-      receiver_type: "mentor", //always mentor
-      content: text,
-    });
+    const { data: inserted, error } = await supabase
+      .from("messages")
+      .insert({
+        sender_id: mentor.id,
+        receiver_id: profileId,
+        receiver_type: "mentor", //always mentor
+        content: text,
+      })
+      .select();
 
     if (error) {
       console.error("Send error:", error);
+      toast.error("Your message could not be sent. Please try again.");
     } else {
       setText("");
+      // Realtime is not available on this deployment, so show the message the
+      // moment it is stored instead of waiting for a reload.
+      const row = Array.isArray(inserted) ? inserted[0] : inserted;
+      if (row) setMessages((prev) => [...prev, row as Message]);
     }
   };
 

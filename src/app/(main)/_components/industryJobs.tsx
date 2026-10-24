@@ -39,6 +39,7 @@ import { Separator } from "@/components/ui/separator";
 import CollegesList from "./CollegesDataUi";
 import Image from "next/image";
 import { Label } from "@/components/ui/label";
+import { useRouter } from "next/navigation";
 import {
   Select,
   SelectContent,
@@ -191,8 +192,10 @@ const demoJobs: Job[] = [
 export default function CareerTabsDemo() {
   const supabase = createClient();
   const { user } = useUserData();
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState("jobs");
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [jobsError, setJobsError] = useState("");
   const [loading, setLoading] = useState(false);
   const { quizData } = useQuizData();
 
@@ -210,12 +213,17 @@ export default function CareerTabsDemo() {
     const fetchJobs = async () => {
       try {
         setLoading(true);
+        setJobsError("");
         const res = await axios.get<Job[]>(
           `/api/jobs?q=${encodeURIComponent(quizData.selectedCareer)}`
         );
         setJobs(res.data);
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error fetching jobs:", error);
+        setJobsError(
+          error?.response?.data?.error ||
+            "Could not load live jobs right now. Please try again later."
+        );
       } finally {
         setLoading(false);
       }
@@ -426,8 +434,9 @@ export default function CareerTabsDemo() {
             <Button
               className="cursor-pointer font-inter text-sm"
               variant="outline"
+              onClick={() => router.push("/home/job-tracker")}
             >
-              Liked Jobs <Heart className="ml-2" />
+              Tracked Jobs <Heart className="ml-2" />
             </Button>
           </div>
         )}
@@ -463,6 +472,8 @@ export default function CareerTabsDemo() {
                   ))}
                 </div>
               </>
+            ) : jobsError ? (
+              <p className="text-muted-foreground">{jobsError}</p>
             ) : jobs.length === 0 ? (
               <p className="text-muted-foreground">
                 No jobs found for {quizData?.selectedCareer}
@@ -478,7 +489,19 @@ export default function CareerTabsDemo() {
                       <h3 className="font-semibold font-inter tracking-tight text-center text-lg line-clamp-2">
                         {job.title}
                       </h3>
-                      <div className="w-9 h-9 rounded-md flex items-center justify-center bg-blue-100 cursor-pointer">
+                      <div
+                        className="w-9 h-9 rounded-md flex items-center justify-center bg-blue-100 cursor-pointer"
+                        onClick={() => handleOpen(job)}
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`Track ${job.title} at ${job.company_name}`}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            handleOpen(job);
+                          }
+                        }}
+                      >
                         <Heart className="w-4 h-4 text-blue-500" />
                       </div>
                     </div>

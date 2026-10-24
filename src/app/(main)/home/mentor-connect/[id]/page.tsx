@@ -136,7 +136,15 @@ export default function MentorConnectPage() {
       return;
     }
 
-    const cost = sessionType === "10" ? 10 : sessionType === "30" ? 20 : 35;
+    // The picker defaults to "now", so without this guard students could book
+    // sessions in the past and the mentor could never join them.
+    if (date.getTime() <= Date.now() + 60_000) {
+      toast.error("Pick a start time at least a minute from now.");
+      return;
+    }
+
+    const cost =
+      sessions.find((s) => s.time === sessionType)?.coins ?? 35;
 
     // check credits
     if (user.remainingCredits < cost) {
@@ -194,13 +202,18 @@ export default function MentorConnectPage() {
 
     if (updateError) {
       console.error("Error updating credits:", updateError);
+      setOpen(false);
+      toast.warning(
+        "The session was requested, but your credits could not be updated. Contact support before booking again."
+      );
+      return;
     }
 
     setOpen(false);
     setSessionType(null);
     setNotes("");
     setDate(new Date());
-    toast.success("Session booked successfully!");
+    toast.success(`Session booked successfully! ${cost} coins used.`);
   }
 
   if (loading)
@@ -259,12 +272,6 @@ export default function MentorConnectPage() {
           </div>
         </div>
         <div className="absolute -bottom-5 right-36 flex items-center gap-10">
-          <Button
-            size="lg"
-            className="bg-gray-100 text-black font-inter text-base hover:bg-white"
-          >
-            Bookmark <LuBookmark className="text-amber-500" />
-          </Button>
           <button
             onClick={() => router.push(`/home/messages/mentor/${mentor?.id}`)}
             className="bg-amber-300 text-black font-inter text-base py-2 px-8 rounded-lg flex gap-3 items-center hover:bg-amber-400"
@@ -281,7 +288,7 @@ export default function MentorConnectPage() {
           <div className="flex items-center gap-5 mb-8 mt-8 h-[60px]">
             <div>
               <h2 className="font-inter underline whitespace-nowrap underline-offset-4 text-lg font-semibold ">
-                Current Ocupation
+                Current Occupation
               </h2>
               <p className="text-black text-lg font-inter font-medium capitalize mt-3 ">
                 {mentor?.current_position}
@@ -326,10 +333,10 @@ export default function MentorConnectPage() {
 
               <div className="flex gap-6 mt-auto justify-center">
                 <Button
-                  // onClick={() => {
-                  //   setSessionType("10");
-                  //   setOpen(true);
-                  // }}
+                  onClick={() => {
+                    setSessionType("10");
+                    setOpen(true);
+                  }}
                   className="cursor-pointer text-sm font-inter tracking-tight"
                   size="sm"
                   variant="outline"

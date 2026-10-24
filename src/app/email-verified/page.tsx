@@ -42,9 +42,10 @@ export default function EmailVerified() {
         </CardHeader>
         <CardContent className="flex flex-col items-center space-y-4">
           <p className="text-gray-600 text-sm text-center font-raleway">
-            Your email has been successfully verified. You can now Go back and log in or click the button below.
+            Your email has been successfully verified. You can now log in with
+            your account, or use the button below.
           </p>
-          <Link href="/">
+          <Link href="/auth">
             <Button variant="outline" className="w-full cursor-pointer">
               Go to Login
             </Button>

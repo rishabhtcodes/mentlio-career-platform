@@ -5,16 +5,78 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { useUserData } from "@/context/UserDataProvider";
 import { useQuizData } from "@/context/userQuizProvider";
+import { createClient } from "@/lib/supabase/client";
 import { LucideActivity, LucideEdit } from "lucide-react";
 import Image from "next/image";
-import React from "react";
+import { useRouter } from "next/navigation";
+import React, { useEffect, useState } from "react";
 import { LuCopy } from "react-icons/lu";
+import { toast } from "sonner";
 
 const UserProfile = () => {
   const { user } = useUserData();
   const { quizData } = useQuizData();
-  // console.log(quizData);
-  // console.log(user);
+  const router = useRouter();
+  const supabase = createClient();
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({
+    userName: "",
+    userPhone: "",
+    institutionName: "",
+    current_status: "",
+    mainFocus: "",
+  });
+
+  useEffect(() => {
+    if (!user) return;
+    setForm({
+      userName: user.userName || "",
+      userPhone: user.userPhone || "",
+      institutionName: user.institutionName || "",
+      current_status: user.current_status || "",
+      mainFocus: user.mainFocus || "",
+    });
+  }, [user]);
+
+  const setField = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setForm((prev) => ({ ...prev, [key]: e.target.value }));
+
+  const saveProfile = async () => {
+    if (!user?.id) return;
+    if (form.userName.trim().length < 2) {
+      toast.error("Please enter your name.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const { error } = await supabase.from("users").update(form).eq("id", user.id);
+      if (error) throw error;
+      toast.success("Profile updated.");
+      setEditing(false);
+      router.refresh();
+    } catch (err: any) {
+      console.error("Profile update failed:", err);
+      toast.error(err?.message || "Failed to save profile.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const copyInviteLink = async () => {
+    if (!user?.invite_link) {
+      toast.info("No invite link generated yet.");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(
+        `${window.location.origin}/invite/${user.invite_link}`
+      );
+      toast.success("Invite link copied.");
+    } catch {
+      toast.error("Clipboard access was blocked by the browser.");
+    }
+  };
 
   return (
     <div className="w-full h-full bg-gray-50 ">
@@ -27,14 +89,44 @@ const UserProfile = () => {
           className="w-[120px] h-[120px] absolute top-16 left-16 rounded-full"
         />
         <div className="flex items-center gap-12 absolute top-24 left-[260px]">
-          <Button className="font-inter" variant="outline">
-            Edit Profile
-            <LucideEdit />
-          </Button>
-          <Button className="font-sora " variant="outline">
-            {user?.isPro ? "Pro user" : "Upgrade Now"}
-            <LucideActivity />
-          </Button>
+          {editing ? (
+            <>
+              <Button
+                className="font-inter cursor-pointer"
+                onClick={saveProfile}
+                disabled={saving}
+              >
+                {saving ? "Saving..." : "Save Changes"}
+              </Button>
+              <Button
+                className="font-inter cursor-pointer"
+                variant="outline"
+                onClick={() => setEditing(false)}
+                disabled={saving}
+              >
+                Cancel
+              </Button>
+            </>
+          ) : (
+            <Button
+              className="font-inter cursor-pointer"
+              variant="outline"
+              onClick={() => setEditing(true)}
+            >
+              Edit Profile
+              <LucideEdit />
+            </Button>
+          )}
+          {!user?.isPro && (
+            <Button
+              className="font-sora cursor-pointer"
+              variant="outline"
+              onClick={() => router.push("/home/settings/billing")}
+            >
+              Upgrade Now
+              <LucideActivity />
+            </Button>
+          )}
         </div>
 
         <Image
@@ -58,8 +150,9 @@ const UserProfile = () => {
             <Input
               id="name"
               type="text"
-              value={user?.userName}
-              readOnly
+              value={form.userName}
+              readOnly={!editing}
+              onChange={setField("userName")}
               className="bg-white w-full font-raleway"
             />
           </div>
@@ -73,7 +166,7 @@ const UserProfile = () => {
             <Input
               id="email"
               type="text"
-              value={user?.userEmail}
+              value={user?.userEmail || ""}
               readOnly
               className="bg-white w-full font-raleway"
             />
@@ -88,8 +181,9 @@ const UserProfile = () => {
             <Input
               id="phone"
               type="text"
-              value={user?.userPhone}
-              readOnly
+              value={form.userPhone}
+              readOnly={!editing}
+              onChange={setField("userPhone")}
               className="bg-white w-full font-inter"
             />
           </div>
@@ -107,7 +201,13 @@ const UserProfile = () => {
               readOnly
               className="bg-white w-full font-inter"
             />
-            <LuCopy className="cursor-pointer" size={26} />
+            <LuCopy
+              className="cursor-pointer"
+              size={26}
+              onClick={copyInviteLink}
+              role="button"
+              aria-label="Copy invite link"
+            />
           </div>
         </div>
         <Separator className="my-6 max-w-[700px]" />
@@ -118,30 +218,32 @@ const UserProfile = () => {
           <div className="flex items-center max-w-[600px] gap-8">
             <Label
               className="font-sora text-base whitespace-nowrap"
-              htmlFor="email"
+              htmlFor="institution"
             >
               Institute/College Name
             </Label>
             <Input
-              id="name"
+              id="institution"
               type="text"
-              value={user?.institutionName}
-              readOnly
+              value={form.institutionName}
+              readOnly={!editing}
+              onChange={setField("institutionName")}
               className="bg-white w-full font-raleway"
             />
           </div>
           <div className="flex items-center max-w-[450px] gap-8">
             <Label
               className="font-sora text-base whitespace-nowrap"
-              htmlFor="current_status"
+              htmlFor="occupation"
             >
               Current Occupation
             </Label>
             <Input
-              id="current_status"
+              id="occupation"
               type="text"
-              value={user?.current_status}
-              readOnly
+              value={form.current_status}
+              readOnly={!editing}
+              onChange={setField("current_status")}
               className="bg-white w-full font-raleway"
             />
           </div>
@@ -155,8 +257,9 @@ const UserProfile = () => {
             <Input
               id="mainFocus"
               type="text"
-              value={user?.mainFocus}
-              readOnly
+              value={form.mainFocus}
+              readOnly={!editing}
+              onChange={setField("mainFocus")}
               className="bg-white w-full font-inter"
             />
           </div>
@@ -169,12 +272,12 @@ const UserProfile = () => {
           <div className="flex items-center max-w-[500px] gap-8">
             <Label
               className="font-sora text-base whitespace-nowrap"
-              htmlFor="email"
+              htmlFor="choosedCareer"
             >
-              Choosed Career
+              Chosen Career
             </Label>
             <Input
-              id="name"
+              id="choosedCareer"
               type="text"
               value={quizData?.selectedCareer || "Not Selected"}
               readOnly
@@ -184,14 +287,14 @@ const UserProfile = () => {
           <div className="flex items-center max-w-[450px] gap-8">
             <Label
               className="font-sora text-base whitespace-nowrap"
-              htmlFor="current_status"
+              htmlFor="currentStream"
             >
               Current Stream
             </Label>
             <Input
-              id="current_status"
+              id="currentStream"
               type="text"
-              value={quizData?.quizInfo.stream || "Not Selected"}
+              value={quizData?.quizInfo?.stream || "Not Selected"}
               readOnly
               className="bg-white w-full font-raleway"
             />

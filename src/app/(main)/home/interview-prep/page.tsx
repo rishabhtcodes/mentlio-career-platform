@@ -2,32 +2,45 @@
 
 import { Separator } from "@/components/ui/separator";
 import SingleCard from "../../_components/InterviewSingleCard";
-import { LuCircleFadingArrowUp } from "react-icons/lu";
+import { LuCircleFadingArrowUp, LuLoader } from "react-icons/lu";
 import { Button } from "@/components/ui/button";
 import { GhostIcon, LucideActivity, LucideHistory } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { InterviewFeedback } from "@/lib/types/allTypes";
 import { useUserData } from "@/context/UserDataProvider";
+import { useInterview } from "@/context/InterviewContext";
 import { createClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { format } from "date-fns";
+import { toast } from "sonner";
+import axios from "axios";
 
 import { useRouter } from "next/navigation";
 
 const InterviewDefault = () => {
   const router = useRouter();
   const { user } = useUserData();
+  const { setInterviewData } = useInterview();
   const [feedbacks, setFeedbacks] = useState<InterviewFeedback[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<InterviewFeedback | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [jobTitle, setJobTitle] = useState("");
+  const [jobDescription, setJobDescription] = useState("");
   const supabase = createClient();
 
   useEffect(() => {
@@ -52,9 +65,77 @@ const InterviewDefault = () => {
     fetchFeedbacks();
   }, [user]);
 
+  const formatDate = (value: string) => {
+    const date = new Date(value);
+    return date.getTime()
+      ? format(date, "dd MMM yyyy, hh:mm a")
+      : "Unknown date";
+  };
+
+  const now = new Date();
+  const completedThisMonth = feedbacks.filter((fb) => {
+    const date = new Date(fb.created_at);
+    return (
+      !isNaN(date.getTime()) &&
+      date.getMonth() === now.getMonth() &&
+      date.getFullYear() === now.getFullYear()
+    );
+  }).length;
+
+  const handleGenerateInterview = async () => {
+    const title = jobTitle.trim();
+    const description = jobDescription.trim();
+
+    if (title.length < 3) {
+      toast.error("Enter the job title for this interview.");
+      return;
+    }
+    if (description.length < 20) {
+      toast.error("Add a short job description.", {
+        description: (
+          <span className="text-gray-600 font-inter">
+            Paste the posting or list the key skills — the AI builds the
+            questions from it.
+          </span>
+        ),
+      });
+      return;
+    }
+
+    setGenerating(true);
+    try {
+      const response = await axios.post("/api/ai/qna-generate", {
+        jobTitle: title,
+        jobDescription: description,
+      });
+
+      const questions = (
+        response.data?.data?.interviewQuestions || []
+      ).filter((q: any) => q?.question);
+
+      if (questions.length === 0) {
+        toast.error("The AI returned no questions. Please try again.");
+        return;
+      }
+
+      setInterviewData({ jobTitle: title, questions });
+      setCreateOpen(false);
+      toast.success(`${questions.length} questions ready. Starting interview…`);
+      router.push("/home/interview-prep/start");
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.error ||
+        error?.response?.data?.message ||
+        "Could not generate interview questions. Please try again.";
+      toast.error(message);
+    } finally {
+      setGenerating(false);
+    }
+  };
+
   return (
     <div className="bg-gray-50 h-full overflow-hidden w-full px-2 py-4">
-      <SingleCard />
+      <SingleCard onStart={() => setCreateOpen(true)} />
       <div className="mt-6 flex w-full h-full">
         {/* LEFT SIDE */}
         <div className="w-[320px] flex flex-col px-1">
@@ -70,7 +151,7 @@ const InterviewDefault = () => {
             <Button
               className="text-sm font-inter mt-4 w-full cursor-pointer"
               variant="outline"
-              onClick={() => router.push("/home/interview-prep/start")}
+              onClick={() => setCreateOpen(true)}
             >
               Create New{" "}
               <LuCircleFadingArrowUp className="inline w-5 h-5 ml-2" />{" "}
@@ -96,10 +177,10 @@ const InterviewDefault = () => {
               className="w-full h-full object-cover absolute -left-28"
             />
             <h2 className="font-extrabold font-inter text-black text-4xl absolute top-[34%] right-[40%]">
-              5
+              {loading ? "–" : completedThisMonth}
             </h2>
             <h2 className="font-medium font-inter text-black text-xl absolute top-[60%] right-5 text-center max-w-[180px]">
-              Interview Creation left for this month
+              Interviews completed this month
             </h2>
           </div>
         </div>
@@ -113,13 +194,16 @@ const InterviewDefault = () => {
             // All cards will be displayed
             <div className="grid grid-cols-3 gap-5 mt-6">
               {feedbacks.map((fb) => {
-                const ratings = fb.interviewInsights.feedback.rating;
-                const avgScore = (
-                  Object.values(ratings).reduce(
-                    (acc, val) => acc + (val || 0),
-                    0
-                  ) / Object.keys(ratings).length
-                ).toFixed(1);
+                const ratings = fb.interviewInsights?.feedback?.rating || {};
+                const entries = Object.entries(ratings as Record<string, number>);
+                const avgScore = entries.length
+                  ? (
+                      entries.reduce(
+                        (acc, [, val]) => acc + (Number(val) || 0),
+                        0
+                      ) / entries.length
+                    ).toFixed(1)
+                  : "–";
 
                 return (
                   <Card
@@ -131,7 +215,7 @@ const InterviewDefault = () => {
                       {fb.jobTitle || "Interview "}
                     </h3>
                     <p className="text-sm text-muted-foreground font-inter -mt-4">
-                      {format(new Date(fb.created_at), "dd MMM yyyy, hh:mm a")}
+                      {formatDate(fb.created_at)}
                     </p>
                     <div className="flex items-center justify-between">
                       <p className="font-inter text-sm text-gray-600">
@@ -162,14 +246,15 @@ const InterviewDefault = () => {
               {selected?.jobTitle || "Interview"}
             </DialogTitle>
             <p className="text-sm font-inter text-gray-500">
-              {selected &&
-                format(new Date(selected.created_at), "dd MMM yyyy, hh:mm a")}
+              {selected && formatDate(selected.created_at)}
             </p>
           </DialogHeader>
 
           {selected && (
             <div className="space-y-4 mt-4">
-              {Object.entries(selected.interviewInsights.feedback.rating).map(
+              {Object.entries(
+                selected.interviewInsights?.feedback?.rating || {}
+              ).map(
                 ([key, value]) => {
                   const score = value ?? 0;
                   const getColor = () => {
@@ -198,11 +283,83 @@ const InterviewDefault = () => {
               <div className="mt-5">
                 <h4 className="font-sora font-semibold mb-2">Summary</h4>
                 <p className="text-sm text-gray-800 font-inter leading-relaxed">
-                  {selected.interviewInsights.feedback.summary}
+                  {selected.interviewInsights?.feedback?.summary ||
+                    "No written summary was stored for this interview."}
                 </p>
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ---------- Create interview dialog ---------- */}
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="font-sora text-xl">
+              Create a new AI interview
+            </DialogTitle>
+            <DialogDescription className="font-inter text-sm">
+              Mentlio generates 6-7 questions from the role and description,
+              then the AI interviewer asks them out loud.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 mt-2">
+            <div className="space-y-2">
+              <Label htmlFor="interviewJobTitle" className="font-inter text-sm">
+                Job title
+              </Label>
+              <Input
+                id="interviewJobTitle"
+                placeholder="e.g. Frontend Developer"
+                value={jobTitle}
+                onChange={(e) => setJobTitle(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label
+                htmlFor="interviewJobDescription"
+                className="font-inter text-sm"
+              >
+                Job description or key skills
+              </Label>
+              <Textarea
+                id="interviewJobDescription"
+                rows={5}
+                placeholder="e.g. React, TypeScript, Next.js, state management, REST APIs, testing, performance optimisation."
+                value={jobDescription}
+                onChange={(e) => setJobDescription(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setCreateOpen(false)}
+              disabled={generating}
+              className="font-inter text-sm cursor-pointer"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleGenerateInterview}
+              disabled={generating}
+              className="font-inter text-sm cursor-pointer bg-blue-500 text-white hover:bg-blue-700"
+            >
+              {generating ? (
+                <>
+                  <LuLoader className="w-4 h-4 mr-2 animate-spin" />
+                  Generating
+                </>
+              ) : (
+                <>
+                  Start Interview <LucideActivity className="w-4 h-4 ml-2" />
+                </>
+              )}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

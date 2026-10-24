@@ -8,8 +8,10 @@
     "start": "next start",
     "lint": "eslint",
     "test:auth": "node scripts/test-auth.mjs",
+    "test:functional": "node scripts/test-functional.mjs",
     "test:llm": "node scripts/test-llm.mjs",
-    "test": "node scripts/test-auth.mjs && node scripts/test-llm.mjs"
+    "test": "npm run test:auth && npm run test:security && npm run test:functional && npm run test:llm",
+    "test:security": "node scripts/test-api-security.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

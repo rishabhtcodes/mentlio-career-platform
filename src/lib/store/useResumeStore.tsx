@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 
 export type Bio = {
   name: string;
@@ -97,18 +98,20 @@ interface ResumeStore {
   setThemeColor: (color: any) => void;
 }
 
-export const useResumeStore = create<ResumeStore>((set) => ({
-  resume: {
-    title: "",
-    bio: {
-      name: "",
-      email: "",
-      phone: "",
-      linkedin: "",
-      github: undefined,
-      website: undefined,
-    },
-    sections: [
+export const useResumeStore = create<ResumeStore>()(
+  persist(
+    (set) => ({
+      resume: {
+        title: "",
+        bio: {
+          name: "",
+          email: "",
+          phone: "",
+          linkedin: "",
+          github: undefined,
+          website: undefined,
+        },
+        sections: [
       {
         id: "summary",
         type: "summary",
@@ -233,4 +236,10 @@ export const useResumeStore = create<ResumeStore>((set) => ({
 
       return { resume: { ...state.resume, sections: updated } };
     }),
-}));
+    }),
+    {
+      name: "mentlio.resume-draft",
+      partialize: (state) => ({ resume: state.resume }),
+    }
+  )
+);

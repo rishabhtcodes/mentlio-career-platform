@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import { getJson } from "serpapi";
-import { createClient } from "@/lib/supabase/client";
+import { getTable } from "@/lib/auth/db";
 
 interface CollegeResult {
   id: string;
@@ -260,20 +260,22 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // Process Supabase DB query ONLY if specific local region requested OR as low priority fallback
+    // Process DB colleges ONLY if specific local region requested OR as low priority fallback
     if (!isNationwide || dynamicColleges.length === 0) {
       try {
-        const supabase = createClient();
-        let dbQuery = supabase.from("colleges").select("*");
+        let dbRows = getTable("colleges");
 
         if (collegeType) {
-          dbQuery = dbQuery.eq("type", collegeType.toLowerCase());
+          dbRows = dbRows.filter((r) => String(r.type || "").toLowerCase() === collegeType.toLowerCase());
         }
         if (!isNationwide) {
-          dbQuery = dbQuery.ilike("location", `%${locationTerm}%`);
+          const term = locationTerm.toLowerCase();
+          dbRows = dbRows.filter((r) =>
+            String(r.location || "").toLowerCase().includes(term)
+          );
         }
 
-        const { data: dbData } = await dbQuery.limit(10);
+        const dbData = dbRows.slice(0, 10);
 
         (dbData || []).forEach((dbCol: any, idx: number) => {
           const rawBest = Array.isArray(dbCol.best_suit_for)

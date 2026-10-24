@@ -43,22 +43,28 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // One message for every failure path: distinguishing "user not found" from
+    // "incorrect password" let anyone enumerate which emails have accounts.
+    const invalidCredentials = () =>
+      NextResponse.json({ error: "Invalid email or password." }, { status: 401 });
+
+    // Burn the same scrypt work when the account does not exist, so response
+    // timing does not reveal whether an email is registered.
     if (!foundUser) {
-      return NextResponse.json(
-        { error: "Invalid login credentials. User not found." },
-        { status: 401 }
-      );
+      await verifyPassword(password, `${"0".repeat(32)}:${"0".repeat(128)}`);
+      return invalidCredentials();
     }
 
-    // Verify password if user has passwordHash
-    if (foundUser.passwordHash) {
-      const isValid = await verifyPassword(password, foundUser.passwordHash);
-      if (!isValid) {
-        return NextResponse.json(
-          { error: "Invalid login credentials. Incorrect password." },
-          { status: 401 }
-        );
-      }
+    // Accounts without a password hash (e.g. directory-seeded mentors) can never
+    // be logged in — there is no credential to verify against. This closes the
+    // "any password logs in" hole for password-less rows.
+    if (!foundUser.passwordHash || typeof foundUser.passwordHash !== "string") {
+      return invalidCredentials();
+    }
+
+    const isValid = await verifyPassword(password, foundUser.passwordHash);
+    if (!isValid) {
+      return invalidCredentials();
     }
 
     // Establish session
@@ -95,7 +101,7 @@ export async function POST(req: NextRequest) {
   } catch (err: any) {
     console.error("Login error:", err);
     return NextResponse.json(
-      { error: err.message || "An unexpected error occurred during login." },
+      { error: "An unexpected error occurred during login." },
       { status: 500 }
     );
   }
