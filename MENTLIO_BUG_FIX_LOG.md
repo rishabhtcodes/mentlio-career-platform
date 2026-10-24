@@ -248,6 +248,15 @@ Status legend: FIXED — RETESTED / FIXED — pending retest / BLOCKED
 - Home quick-action card read "personalized path.." (double period); the Discord OAuth 501 message named `DISCORD_SECRET` while the route actually reads `DISCORD_CLIENT_SECRET`, which would misdirect a deployment.
 - **Retest:** targeted eslint 0 errors, `tsc --noEmit` clean, production build exit 0.
 
+### 51. Colleges endpoint masked a missing provider key as a 500 — FIXED — RETESTED
+- **Repro:** `GET /api/colleges?search=indian` returned HTTP 500 with a bare `[]` body because `SERPAPI_KEY` is a placeholder and SerpApi threw `Invalid API key`.
+- **Fix:** the route now rejects a missing/placeholder key before calling the provider with `503 SEARCH_PROVIDER_UNCONFIGURED`, maps a rejected key to `503 SEARCH_PROVIDER_INVALID_KEY`, and returns a JSON error (not an empty array) for genuine failures.
+- **Retest:** local endpoint → 503 `SEARCH_PROVIDER_UNCONFIGURED`; `npx tsc --noEmit` clean.
+
+### Production deployment finding (2026-10-24) — BLOCKED on Vercel environment
+- The live site is still the 2026-10-22 deployment. The push of `b8ccdbc` produced a failed Vercel deployment (`dpl_F934uwxuU23fvs1VHqRtKn6qysGT`) because production now fails closed when `SESSION_SECRET` is absent/short. The previous build escaped this by signing sessions with a secret hardcoded in a public repository.
+- Local verification of the live site shows the old build's defects: anonymous `POST /api/data/users` succeeds, anonymous `POST /api/ai/roadmap-gen` returns 200, login leaks "User not found.", the public mentor directory exposes `phone` and `email`, and the security headers are missing. All of these are already fixed in the current commit; redeploying requires `SESSION_SECRET` to be set in Vercel.
+
 ## Known limitations / BLOCKED
 - **DB persistence on Vercel:** file-based JSON at `/tmp/mentlio.json` is ephemeral per deployment — BLOCKED on external persistent DB (Postgres/Supabase). Exact requirement documented in final audit.
 - **Live LLM keys:** Groq is live and now serves roadmap-gen, qna-generate, generate-checkpoint, quiz-feedback, feedback and the mock-test pipeline (429 rate limit is the only remaining failure, reported honestly as `LLM_RATE_LIMITED`); Gemini key is revoked → career-coach answers through the Groq fallback; Pinecone/Vapi/Razorpay/SerpApi placeholders → 503. Never simulated success.

@@ -243,6 +243,25 @@ Summary only; details and residual risk are in `MENTLIO_FINAL_AUDIT.md`.
 | Live production site re-verified after the fixes | NOT TESTED — fixes are not deployed; deployment would need explicit authorization |
 | Exact deployment steps | Listed in `MENTLIO_FINAL_AUDIT.md` §6 |
 
+### Live production audit (https://mentlio-career-platform.vercel.app/, 2026-10-24)
+
+The live site is the 2026-10-22 build. The new commit's Vercel deployment **failed**, so none of the fixes in this report are live.
+
+| Probe | Live result | Status |
+|---|---|---|
+| `GET /` anonymous | Redirects to `/auth` | PASS |
+| `GET /web` | 200 | PASS |
+| Security headers | Only HSTS; no `nosniff`/`X-Frame-Options`/`Referrer-Policy`/`Permissions-Policy` | FAIL (fixed in current commit, not deployed) |
+| `POST /api/data/users` anonymous | **200** — row created without a session | **FAIL — critical** (blocked with 401 locally) |
+| `GET /api/data/mentors` | Public rows include `phone` and `email` | **FAIL — privacy** (projected locally) |
+| `POST /api/ai/roadmap-gen` anonymous | **200** — AI generated without login | **FAIL — cost abuse** (401 locally) |
+| `POST /api/auth/login` unknown email | `"User not found."` | FAIL — enumeration (generic 401 locally) |
+| `POST /api/ai/career-coach` anonymous | 503 (Gemini key rejected) | Honest failure, but auth check missing in live build |
+| `GET /api/colleges` | 500 with `[]` (placeholder SerpApi key) | FAIL → FIXED locally (503 code) |
+| Vercel deployment for `b8ccdbc` | `failure` — `dpl_F934uwxuU23fvs1VHqRtKn6qysGT` | **BLOCKED** — `SESSION_SECRET` not set in Vercel |
+
+One junk `users` row (`id 1792804323764`) was created by the anonymous-write probe before the vulnerability was understood. It is ephemeral (`/tmp`) and no further production writes were attempted.
+
 ### Failure ledger (nothing hidden)
 
 | Item | Status | Reason / next action |

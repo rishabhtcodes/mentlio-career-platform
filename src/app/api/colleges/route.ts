@@ -171,8 +171,26 @@ export async function GET(req: NextRequest) {
 
   const dynamicColleges: CollegeResult[] = [];
 
+  // A placeholder/missing key makes SerpApi throw "Invalid API key"; returning
+  // an empty list with HTTP 500 hid that. Fail with an explicit, actionable 503.
+  const serpApiKey = process.env.SERPAPI_KEY;
+  const hasLiveSerpApi =
+    !!serpApiKey &&
+    serpApiKey.length >= 20 &&
+    !/dummy|placeholder|your_|changeme|xxx/i.test(serpApiKey);
+
+  if (!hasLiveSerpApi) {
+    return NextResponse.json(
+      {
+        error: "College search is unavailable right now because the search provider is not configured on this server.",
+        code: "SEARCH_PROVIDER_UNCONFIGURED",
+      },
+      { status: 503 }
+    );
+  }
+
   try {
-    const apiKey = process.env.SERPAPI_KEY;
+    const apiKey = serpApiKey;
 
     if (apiKey) {
       let domainQueryKeyword = "";
@@ -331,8 +349,29 @@ export async function GET(req: NextRequest) {
     }));
 
     return NextResponse.json(finalColleges);
-  } catch (error) {
+  } catch (error: any) {
+    const message =
+      typeof error === "string"
+        ? error
+        : error?.message || error?.error || JSON.stringify(error || {});
     console.error("❌ Colleges API Error:", error);
-    return NextResponse.json([], { status: 500 });
+
+    if (/invalid api key|api key should be here|unauthorized/i.test(message)) {
+      return NextResponse.json(
+        {
+          error: "College search is unavailable right now because the configured search provider key was rejected.",
+          code: "SEARCH_PROVIDER_INVALID_KEY",
+        },
+        { status: 503 }
+      );
+    }
+
+    return NextResponse.json(
+      {
+        error: "College search failed. Please try again later.",
+        code: "COLLEGES_FETCH_FAILED",
+      },
+      { status: 500 }
+    );
   }
 }

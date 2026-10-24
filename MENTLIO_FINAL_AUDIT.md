@@ -124,7 +124,7 @@ Still open:
    node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
    vercel env add SESSION_SECRET production
    ```
-   The build intentionally fails without it.
+   The build intentionally fails without it. **This is currently blocking deployment:** the push of `b8ccdbc` produced failed Vercel deployment `dpl_F934uwxuU23fvs1VHqRtKn6qysGT`, and the live site is still the 2026-10-22 build. That older build signs sessions with a secret hardcoded in this public repository and also allows anonymous data writes and AI calls — set the secret and redeploy as the first action.
 3. **Provider credentials** (set only when each feature is wanted; all fail honestly otherwise):
 
    | Feature | Variables |
