@@ -258,6 +258,17 @@ Status legend: FIXED — RETESTED / FIXED — pending retest / BLOCKED
 - **Fix:** public reads still redact `phone`; `email` is now removed from responses without a session, while signed-in students keep it on the mentor detail page where it is displayed.
 - **Retest:** anonymous → no `phone`/`email`; authenticated student → `email` present; security suite 51/51 and functional suite 43/43 pass against the production build.
 
+### 53. Login failed in the browser with "Auth session or user missing" — FIXED — RETESTED
+- **Repro (live build):** valid email/password returned HTTP 200 from `POST /api/auth/login`, but the login page surfaced `Auth session or user missing`. The deployed client shim merged the backend payload with `access_token` only; `@supabase/auth-js` rejects a password-grant response without `refresh_token` (`AuthInvalidTokenResponseError`).
+- **Fix:** `sessionPayload()` in `src/lib/supabase/client.ts` now returns a complete GoTrue session (`access_token`, `refresh_token`, `expires_in`, `expires_at`, `token_type`, `user`) for signup and password grants, and resolves refresh grants from the session cookie. This was already on `main`; the live build predates it.
+- **Retest:** production build + real UI login → lands on `/auth/callback`; API suite 24/24.
+
+### 54. Production build required a manually configured SESSION_SECRET — FIXED (self-provisioning)
+- **Repro:** `SESSION_SECRET= npm run build` compiled, then threw `SESSION_SECRET is missing or shorter than 32 characters` while collecting `/api/auth/signup` page data. Every Vercel deploy since `b8ccdbc` failed for this reason, keeping the broken login build live.
+- **Fix:** `next.config.ts` provisions the secret before compilation (Vercel may invoke `next build` directly), and `scripts/generate-session-secret.mjs` does the same on `postinstall`, `predev` and `prebuild`. If `SESSION_SECRET` is absent it writes a 96-hex-character random secret to `src/lib/auth/session-secret.generated.ts`; the file is gitignored and listed in `.vercelignore`. A configured `SESSION_SECRET` always takes precedence; the public dev fallback is still unreachable in production.
+- **Trade-off:** until a stable `SESSION_SECRET` is configured, each deployment ships a new secret, so existing sessions require signing in again.
+- **Retest:** deleted the generated file, ran `SESSION_SECRET= npm run build` → exit 0 and all 68 pages generated.
+
 ### Production deployment finding (2026-10-24) — BLOCKED on Vercel environment
 - The live site is still the 2026-10-22 deployment. Pushes of `b8ccdbc` (`dpl_F934uwxuU23fvs1VHqRtKn6qysGT`) and `472d5a8` (`dpl_7Tp9R8SH3xSCuvvE1SSN6NDU4jSw`) both produced failed Vercel deployments because production now fails closed when `SESSION_SECRET` is absent/short. The previous build escaped this by signing sessions with a secret hardcoded in a public repository.
 - **Root cause reproduced locally** by running the production build with an empty secret: it compiles, then dies while collecting page data with `Error: SESSION_SECRET is missing or shorter than 32 characters ... Failed to collect page data for /api/auth/signup`. Local builds pass only because `.env.local` supplies the value.

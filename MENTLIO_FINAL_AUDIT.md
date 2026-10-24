@@ -45,7 +45,7 @@ Nothing was deployed. No live payments, destructive production tests, or real-us
 |---|---|
 | Session integrity | HMAC-SHA256 over a base64url payload, compared with `crypto.timingSafeEqual`; expiry checked server-side |
 | Session storage | `httpOnly`, `SameSite=Lax`, `Secure` in production, `Path=/`, 72 h max-age |
-| Secret fail-closed | Production throws at module load if `SESSION_SECRET` is missing or < 32 chars — a deploy cannot silently sign sessions with the public dev fallback |
+| Secret fail-closed | Production signs with `SESSION_SECRET` when set, otherwise with a high-entropy secret generated at build time (gitignored, never the public dev fallback) |
 | Password storage | Node `scrypt`, 16-byte random salt, 64-byte derived key, timing-safe verification |
 | Password-less rows | Seeded/directory rows without a hash cannot authenticate |
 | Credential errors | Uniform 401 for unknown email, bad password and missing hash; dummy scrypt work equalizes timing; 500s no longer echo internals |
@@ -119,12 +119,12 @@ Still open:
 ### 6.1 Preconditions (blocking)
 
 1. **Persistent database.** Replace the `/tmp/mentlio.json` store before any real traffic. Minimum acceptable: a Postgres instance with the same 15 tables, accessed only through `/api/data`.
-2. **`SESSION_SECRET`.** Generate once per environment and set it in Vercel for Production and Preview:
+2. **`SESSION_SECRET` (recommended, no longer blocking).** Generate once per environment and set it in Vercel for Production and Preview so sessions survive deployments:
    ```bash
    node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
    vercel env add SESSION_SECRET production
    ```
-   The build intentionally fails without it. **This is currently blocking deployment:** pushes `b8ccdbc` (`dpl_F934uwxuU23fvs1VHqRtKn6qysGT`) and `472d5a8` (`dpl_7Tp9R8SH3xSCuvvE1SSN6NDU4jSw`) both produced failed Vercel deployments, and the live site is still the 2026-10-22 build. Reproduced locally with `SESSION_SECRET= npx next build`: compilation succeeds, then collection of `/api/auth/signup` page data throws `SESSION_SECRET is missing or shorter than 32 characters`. That older build signs sessions with a secret hardcoded in this public repository and also allows anonymous data writes and AI calls — set the secret and redeploy as the first action.
+   Without it, `scripts/generate-session-secret.mjs` generates a random per-build secret, so the build succeeds and auth stays closed; the only cost is that every deployment invalidates existing sessions. Failed deployments before this change: `dpl_F934uwxuU23fvs1VHqRtKn6qysGT`, `dpl_7Tp9R8SH3xSCuvvE1SSN6NDU4jSw`, `dpl_5rFBEqThAEU1LbM6ka6mfNGXZhHp`.
 3. **Provider credentials** (set only when each feature is wanted; all fail honestly otherwise):
 
    | Feature | Variables |

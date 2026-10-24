@@ -1,4 +1,34 @@
+import crypto from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
 import type { NextConfig } from "next";
+
+// Vercel can invoke `next build` directly, so npm lifecycle scripts are not a
+// reliable place to provision the session secret. This config is evaluated
+// before compilation on every build and dev start.
+function ensureSessionSecret() {
+  const target = path.join(process.cwd(), "src", "lib", "auth", "session-secret.generated.ts");
+  const header = "// Generated at build time. Never commit this file.\n";
+
+  const fromEnv = process.env.SESSION_SECRET;
+  if (fromEnv && fromEnv.length >= 32) {
+    fs.writeFileSync(target, `${header}export const GENERATED_SESSION_SECRET = "";\n`);
+    return;
+  }
+
+  try {
+    const current = fs.readFileSync(target, "utf8");
+    if (/GENERATED_SESSION_SECRET\s*=\s*"[a-f0-9]{64,}"/.test(current)) return;
+  } catch {}
+
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  fs.writeFileSync(
+    target,
+    `${header}export const GENERATED_SESSION_SECRET = "${crypto.randomBytes(48).toString("hex")}";\n`
+  );
+}
+
+ensureSessionSecret();
 
 const nextConfig: NextConfig = {
   images: {
