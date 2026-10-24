@@ -254,8 +254,10 @@ Status legend: FIXED — RETESTED / FIXED — pending retest / BLOCKED
 - **Retest:** local endpoint → 503 `SEARCH_PROVIDER_UNCONFIGURED`; `npx tsc --noEmit` clean.
 
 ### Production deployment finding (2026-10-24) — BLOCKED on Vercel environment
-- The live site is still the 2026-10-22 deployment. The push of `b8ccdbc` produced a failed Vercel deployment (`dpl_F934uwxuU23fvs1VHqRtKn6qysGT`) because production now fails closed when `SESSION_SECRET` is absent/short. The previous build escaped this by signing sessions with a secret hardcoded in a public repository.
+- The live site is still the 2026-10-22 deployment. Pushes of `b8ccdbc` (`dpl_F934uwxuU23fvs1VHqRtKn6qysGT`) and `472d5a8` (`dpl_7Tp9R8SH3xSCuvvE1SSN6NDU4jSw`) both produced failed Vercel deployments because production now fails closed when `SESSION_SECRET` is absent/short. The previous build escaped this by signing sessions with a secret hardcoded in a public repository.
+- **Root cause reproduced locally** by running the production build with an empty secret: it compiles, then dies while collecting page data with `Error: SESSION_SECRET is missing or shorter than 32 characters ... Failed to collect page data for /api/auth/signup`. Local builds pass only because `.env.local` supplies the value.
 - Local verification of the live site shows the old build's defects: anonymous `POST /api/data/users` succeeds, anonymous `POST /api/ai/roadmap-gen` returns 200, login leaks "User not found.", the public mentor directory exposes `phone` and `email`, and the security headers are missing. All of these are already fixed in the current commit; redeploying requires `SESSION_SECRET` to be set in Vercel.
+- Live re-probe after `472d5a8` (2026-10-24): `/api/colleges` still returns `500 []`, unknown-email login still returns `"User not found."`, and the response carries only HSTS — confirming the old build is still serving.
 
 ## Known limitations / BLOCKED
 - **DB persistence on Vercel:** file-based JSON at `/tmp/mentlio.json` is ephemeral per deployment — BLOCKED on external persistent DB (Postgres/Supabase). Exact requirement documented in final audit.

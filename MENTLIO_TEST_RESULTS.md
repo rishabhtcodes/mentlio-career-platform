@@ -259,6 +259,8 @@ The live site is the 2026-10-22 build. The new commit's Vercel deployment **fail
 | `POST /api/ai/career-coach` anonymous | 503 (Gemini key rejected) | Honest failure, but auth check missing in live build |
 | `GET /api/colleges` | 500 with `[]` (placeholder SerpApi key) | FAIL → FIXED locally (503 code) |
 | Vercel deployment for `b8ccdbc` | `failure` — `dpl_F934uwxuU23fvs1VHqRtKn6qysGT` | **BLOCKED** — `SESSION_SECRET` not set in Vercel |
+| Vercel deployment for `472d5a8` | `failure` — `dpl_7Tp9R8SH3xSCuvvE1SSN6NDU4jSw` | **BLOCKED** — same cause, reproduced locally at page-data collection |
+| Re-probe after `472d5a8` | `/api/colleges` 500 `[]`; login `"User not found."`; only HSTS | Old build still serving |
 
 One junk `users` row (`id 1792804323764`) was created by the anonymous-write probe before the vulnerability was understood. It is ephemeral (`/tmp`) and no further production writes were attempted.
 

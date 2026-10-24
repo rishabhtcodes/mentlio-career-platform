@@ -114,7 +114,7 @@ Still open:
 
 ## 6. Deployment readiness — exact remaining steps
 
-> No push or deploy was performed. The following is the handoff.
+> Commits `b8ccdbc` and `472d5a8` were pushed to `origin/main`; Vercel auto-deploy attempted both and failed at the precondition below. The following is the handoff.
 
 ### 6.1 Preconditions (blocking)
 
@@ -124,7 +124,7 @@ Still open:
    node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
    vercel env add SESSION_SECRET production
    ```
-   The build intentionally fails without it. **This is currently blocking deployment:** the push of `b8ccdbc` produced failed Vercel deployment `dpl_F934uwxuU23fvs1VHqRtKn6qysGT`, and the live site is still the 2026-10-22 build. That older build signs sessions with a secret hardcoded in this public repository and also allows anonymous data writes and AI calls — set the secret and redeploy as the first action.
+   The build intentionally fails without it. **This is currently blocking deployment:** pushes `b8ccdbc` (`dpl_F934uwxuU23fvs1VHqRtKn6qysGT`) and `472d5a8` (`dpl_7Tp9R8SH3xSCuvvE1SSN6NDU4jSw`) both produced failed Vercel deployments, and the live site is still the 2026-10-22 build. Reproduced locally with `SESSION_SECRET= npx next build`: compilation succeeds, then collection of `/api/auth/signup` page data throws `SESSION_SECRET is missing or shorter than 32 characters`. That older build signs sessions with a secret hardcoded in this public repository and also allows anonymous data writes and AI calls — set the secret and redeploy as the first action.
 3. **Provider credentials** (set only when each feature is wanted; all fail honestly otherwise):
 
    | Feature | Variables |
