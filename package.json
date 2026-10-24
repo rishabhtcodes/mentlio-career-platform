@@ -4,7 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
+    "predev": "node scripts/generate-session-secret.mjs",
     "build": "next build --turbopack",
+    "prebuild": "node scripts/generate-session-secret.mjs",
+    "postinstall": "node scripts/generate-session-secret.mjs",
     "start": "next start",
     "lint": "eslint",
     "test:auth": "node scripts/test-auth.mjs",

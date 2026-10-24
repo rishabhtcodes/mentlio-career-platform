@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import { cookies } from "next/headers";
+import { GENERATED_SESSION_SECRET } from "./session-secret.generated";
 
 const SESSION_COOKIE_NAME = "mentlio_session";
 
@@ -12,6 +13,11 @@ const DEV_ONLY_FALLBACK_SECRET = "mentlio-super-secure-local-session-secret-key-
 function resolveSessionSecret(): string {
   const fromEnv = process.env.SESSION_SECRET;
   if (fromEnv && fromEnv.length >= 32) return fromEnv;
+  // Without a configured secret, sign with a high-entropy value generated at
+  // build time. It is never committed and is shared by every instance of the
+  // deployment, so auth stays closed instead of falling back to a public key.
+  // Set SESSION_SECRET to keep sessions valid across deployments.
+  if (GENERATED_SESSION_SECRET.length >= 32) return GENERATED_SESSION_SECRET;
   if (process.env.NODE_ENV === "production") {
     throw new Error(
       "SESSION_SECRET is missing or shorter than 32 characters. Generate one with: node -e \"console.log(require('crypto').randomBytes(48).toString('hex'))\""

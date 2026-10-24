@@ -58,3 +58,6 @@ scripts/sync-vercel-env.cjs
 
 # local database (contains credential hashes - never commit)
 data/mentlio.json
+
+# build-time generated session secret (contains a signing key)
+src/lib/auth/session-secret.generated.ts
