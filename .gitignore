@@ -64,3 +64,4 @@ src/lib/auth/session-secret.generated.ts
 
 # capstone research paper (local deliverable, not part of the repository)
 /RESEARCH_PAPER.md
+figures/
