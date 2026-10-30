@@ -65,3 +65,10 @@ src/lib/auth/session-secret.generated.ts
 # capstone research paper (local deliverable, not part of the repository)
 /RESEARCH_PAPER.md
 figures/
+
+#MD-Files
+MENTLIO_BUG_FIX_LOG.md
+MENTLIO_FINAL_AUDIT_REPORT.md
+MENTLIO_LLM_AUDIT.md
+MENTLIO_PRODUCTION_AUDIT.md
+
