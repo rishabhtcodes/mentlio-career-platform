@@ -43,18 +43,14 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# local reports & audits
-*REPORT*.md
-*COMPARISON*.md
-*AUDIT*.md
-TEST_REPORT.md
-PRODUCTION_READINESS_REPORT.md
-CLARIO_MENTLIO_COMPARISON.md
-MENTLIO_FINAL_AUDIT_REPORT.md
-MENTLIO_PRODUCTION_AUDIT.md
-MENTLIO_LLM_AUDIT.md
+# markdown files (ignore all except requirements and readme)
+*.md
+!readme.md
+!README.md
+!requirements.md
+!REQUIREMENTS.md
+figures/
 scripts/sync-vercel-env.cjs
-
 
 # local database (contains credential hashes - never commit)
 data/mentlio.json
@@ -62,13 +58,5 @@ data/mentlio.json
 # build-time generated session secret (contains a signing key)
 src/lib/auth/session-secret.generated.ts
 
-# capstone research paper (local deliverable, not part of the repository)
-/RESEARCH_PAPER.md
-figures/
 
-#MD-Files
-MENTLIO_BUG_FIX_LOG.md
-MENTLIO_FINAL_AUDIT_REPORT.md
-MENTLIO_LLM_AUDIT.md
-MENTLIO_PRODUCTION_AUDIT.md
 
